@@ -3,6 +3,11 @@ from congestion_coverage_plan.mdp.MDP import MDP, State, Transition
 from congestion_coverage_plan.solver.LrtdpTvmaAlgorithm import LrtdpTvmaAlgorithm
 from congestion_coverage_plan.map_utils.OccupancyMap import OccupancyMap
 import congestion_coverage_plan.utils.dataset_utils as dataset_utils
+import congestion_coverage_plan.utils.Logger as Logger
+from congestion_coverage_plan.tsp.tsp import simulate_tsp
+from congestion_coverage_plan.tsp.tsp import simulate_tsp_current_occupancy
+from congestion_coverage_plan.tsp.tsp import simulate_tsp_with_wait
+import csv
 import warnings
 from congestion_coverage_plan.tsp.tsp import *
 from tqdm import *
@@ -28,9 +33,16 @@ class Simulator:
     def execute_step(self,state, action):
         if action == "wait":
             # state, collisions, traverse_time
-            return State(state.get_vertex(), state.get_time() + self._wait_time, state.get_visited_vertices().copy(), "wait"), 0, self._wait_time
+            return State(state.get_vertex(), state.get_time() + self._wait_time, state.get_visited_vertices().copy(), state.get_pois_explained().copy(), "wait"), 0, self._wait_time
         if action == "explain":
-            return State(state.get_vertex(), state.get_time() + self._explain_time, state.get_visited_vertices().copy(), "explain"), 0, self._explain_time
+            current_vertex = self._occupancy_map.find_vertex_from_id(state.get_vertex())
+            current_poi = current_vertex.get_poi_number()
+            pois_explained = state.get_pois_explained().copy()
+            pois_explained.add(current_poi)
+            return State(vertex=state.get_vertex(), 
+                         time=state.get_time() + self._explain_time, 
+                         visited_vertices=state.get_visited_vertices().copy(), 
+                         pois_explained=pois_explained), 0, self._explain_time
         calculated_traverse_time, collisions = self.calculate_traverse_time(state, action)
 
         next_time = state.get_time() + calculated_traverse_time
@@ -39,8 +51,7 @@ class Simulator:
         visited_vertices = state.get_visited_vertices().copy()
         if next_vertex not in state.get_visited_vertices():
             visited_vertices.add(next_vertex)
-        next_state = State(next_vertex, next_time, visited_vertices, action)
-        print(f"execute step from {state.get_vertex()} to {action}, traverse time: {calculated_traverse_time}, collisions: {collisions}, next state: {next_state}")
+        next_state = State(next_vertex, next_time, visited_vertices, state.get_pois_explained().copy())
         return next_state, collisions, calculated_traverse_time
         
 
@@ -169,7 +180,7 @@ class Simulator:
             # print("state before", state)
             # print("#####################################################################################")
             # print("init", self.get_current_occupancies(state))
-            if len(state.get_visited_vertices()) == len(self._occupancy_map.get_vertices().keys()):
+            if self._occupancy_map.find_vertex_from_id(state.get_vertex()).is_final_goal():
                 completed = True
                 break
             initial_planning_time = datetime.now()
@@ -238,8 +249,9 @@ class Simulator:
 
     def get_current_occupancies(self, state):
         current_time = self._time_for_occupancies + state.get_time()
-        self._occupancy_map.calculate_current_occupancies(current_time)
-        return self._occupancy_map.get_current_occupancies(current_time)
+        self._occupancy_map.detections_retriever.set_timestamp(current_time)
+        self._occupancy_map.calculate_current_occupancies()
+        return self._occupancy_map.get_current_occupancies()
 
 
     def plan(self, current_state, logger, planning_time_bound, solution_time_bound, convergence_threshold, heuristic_function):
@@ -256,14 +268,14 @@ class Simulator:
                                    time_for_occupancies=self._time_for_occupancies + current_state.get_time(),
                                    time_start=current_state.get_time(),
                                    wait_time=self._wait_time,
-                                   vinitState=current_state, 
+                                   initial_state=current_state, 
                                    logger=logger,
                                    heuristic_function=heuristic_function)
         # print("done creating")
         end_time = datetime.now()
         logger.log_time_elapsed("lrtdp_creation_time", (end_time - init_time).total_seconds())
         init_time = datetime.now()
-        result = lrtdp.lrtdp_tvma()
+        result = lrtdp.solve()
         end_time = datetime.now()
         logger.log_time_elapsed("lrtdp_planning_time", (end_time - init_time).total_seconds())
         # print("Result---------------------------------------------------")
@@ -356,10 +368,12 @@ def simulate_tsp_current_occupancy_with_replanning(simulator, time, occupancy_ma
 def simulate_lrtdp(simulator, time, occupancy_map,  initial_state_name, writer, file, logger, convergence_threshold, heuristic_function):
     print("-------------------------------------lrtdp----------------------------------")
     initial_time = datetime.now()
+    print("simulate_lrtdp: time", time)
     steps_lrtdp = simulator.simulate_lrtdp(time, 
                                            State(initial_state_name, 
                                                 0, 
-                                                set([initial_state_name]), None),
+                                                set([initial_state_name]),
+                                                set()),
                                             convergence_threshold,
                                             logger, 
                                             simulate_planning_while_moving=False,
@@ -385,3 +399,4 @@ def simulate_lrtdp_planning_while_moving(simulator, time, occupancy_map,  initia
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_lrtdp_planning_while_moving", steps_lrtdp[0], steps_lrtdp[1], time_used, steps_lrtdp[3], steps_lrtdp[2], len(occupancy_map.get_occupancy_levels())])
     file.flush()
+

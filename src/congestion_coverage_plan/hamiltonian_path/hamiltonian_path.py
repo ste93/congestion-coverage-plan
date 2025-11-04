@@ -587,6 +587,8 @@ def create_matrix_from_vertices_list_from_shortest_path_matrix_tsp(vertices_ids,
 
 def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=INFINITE_DISTANCE, length_function=None, time_for_occupancies=None):
     matrix = []
+    if time_for_occupancies is not None:
+        occupancy_map.set_time_for_fake_detections_retriever(time_for_occupancies)
     initial_vertex_index = vertices_ids.index(initial_vertex_id) + 1
     print("vertices_ids", vertices_ids)
     print("initial_vertex_index", initial_vertex_index)
@@ -619,7 +621,7 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
                 else:
                     # print("finding edge from", vertex_row_id, vertex_column_id)
                     if length_function is not None:
-                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_occupancies_by_time(time_for_occupancies))
+                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_current_occupancies())
                         row.append(math.floor(edge_length * 100))
                     else:
                         edge_length = occupancy_map.find_edge_from_position(vertex_row_id, vertex_column_id)

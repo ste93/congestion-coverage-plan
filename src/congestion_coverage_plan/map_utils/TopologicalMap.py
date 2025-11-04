@@ -18,10 +18,13 @@ import math
 
 
 class Vertex:
-    def __init__(self, id, posx, posy):
+    def __init__(self, id, posx, posy, is_poi = False, poi_number = None, is_final_goal = False):
         self._id = id
         self._posx = posx
         self._posy = posy
+        self._is_poi = is_poi
+        self._poi_number = poi_number
+        self._is_final_goal = is_final_goal
 
     def __eq__(self, other):
         return self._id == other.get_id() and self._posx == other.get_posx() and self._posy == other.get_posy()
@@ -45,6 +48,15 @@ class Vertex:
         # return if is inside a circle with center in the vertex and radius 1
         is_inside = (x - self._posx)**2 + (y - self._posy)**2 <= 1
         return is_inside
+    
+    def is_poi(self):
+        return self._is_poi
+    
+    def get_poi_number(self):
+        return self._poi_number
+
+    def is_final_goal(self):
+        return self._is_final_goal
 
 
 class Edge:
@@ -142,8 +154,6 @@ class Edge:
         return self.area_as_polygon.contains_point((x, y))
 
 
-
-
 class TopologicalMap:
     def __init__(self):
         self.name = ""
@@ -154,8 +164,11 @@ class TopologicalMap:
         self.fig, self.ax = plt.subplots()
         self.edges_from_vertex = {}
         self.edges_class_from_vertex = {}
+        self.pois_set = set()
+        self.final_goal_vertices = set()
 
     ## SETTERS
+
 
     def set_name(self, name):
         self.name = name
@@ -171,7 +184,31 @@ class TopologicalMap:
             self.edges_class_from_vertex[self.edges[key_edge].get_start()][self.edges[key_edge].get_end()] = self.edges[key_edge]
             # self.edges_from_vertex[edge.get_end()].append(edge)
 
+
+    def compute_pois_set(self):
+        self.pois_set = set()
+        for vertex_id in self.vertices.keys():
+            vertex = self.vertices[vertex_id]
+            if vertex.is_poi():
+                self.pois_set.add(vertex.get_poi_number())
+
+
+    def compute_final_goal_vertices(self):
+        self.final_goal_vertices = set()
+        for vertex_id in self.vertices.keys():
+            vertex = self.vertices[vertex_id]
+            if vertex.is_final_goal():
+                self.final_goal_vertices.add(vertex.get_id())
+
     ## GETTERS
+
+
+
+    def get_final_goal_vertices(self):
+        return self.final_goal_vertices
+
+    def get_pois_set(self):
+        return self.pois_set
 
     def get_vertex(self, vertex_id):
         return self.vertices[vertex_id]
@@ -205,33 +242,20 @@ class TopologicalMap:
             edges.append(self.find_edge_from_position(vertex_id, edge_end))
         return edges
 
-
-
-
-    def add_vertex(self, posx, posy):
+    def add_vertex(self, posx, posy, poi_number = None, is_final_goal=False):
         id = str(uuid.uuid4())
         # the check is done in the add_vertex_with_id function
-        return self.add_vertex_with_id(id, posx, posy)
+        if poi_number is not None:
+            self.pois_set.add(poi_number)
+        else :
+            poi_number = None
+        return self.add_vertex_with_id(id, posx, posy, poi_number, is_final_goal)
 
-
-
-
-    def add_vertex_with_id(self, vertex_id, posx, posy):
-        # check if a vertex already exists at the same position or with the same id
-        # for vertex in self.vertices:
-        #     if vertex.get_id() == vertex_id or (vertex.get_posx() == posx and vertex.get_posy() == posy):
-        #         return False
-        # add the vertex
-        # print("Adding vertex with id: ", vertex_id)
-        # if self.vertices.get(vertex_id) is not None:
-        #     print("Vertex already exists: ", vertex_id)
-        #     return False
-        # create the vertex and add it to the vertices list
-        # print("Adding vertex with id: ", vertex_id, " at position: ", posx, posy)
-        # print("self.vertices", self.vertices)
-        self.vertices[vertex_id] = Vertex(vertex_id, posx, posy)
-        # self.vertices.append(Vertex(vertex_id, posx, posy))
+    def add_vertex_with_id(self, vertex_id, posx, posy, poi_number=None, is_final_goal=False):
+        self.vertices[vertex_id] = Vertex(vertex_id, posx, posy, poi_number is not None, poi_number, is_final_goal)
         self.edges_from_vertex[vertex_id] = []
+        if poi_number is not None:
+            self.pois_set.add(poi_number)
         return True
 
 
@@ -332,7 +356,13 @@ class TopologicalMap:
         return self.vertices[vertex_id]
 
 
-
+    def get_poi_vertices(self):
+        poi_vertices = {}
+        for vertex_id in self.vertices.keys():
+            vertex = self.vertices[vertex_id]
+            if vertex.is_poi():
+                poi_vertices[vertex_id] = vertex
+        return poi_vertices
 
 
     def find_edge_from_position(self, start, end):
@@ -365,15 +395,16 @@ class TopologicalMap:
         return edges
 
 
-
-
     ### Functions for saving and loading the topological map
     def save_topological_map(self, filename):
         with open(filename, 'w') as f:
             yaml.dump({'name': self.name, 
                        'vertices': [{'id': self.vertices[vertex_key].get_id(), 
                                      'posx': self.vertices[vertex_key].get_posx(), 
-                                     'posy': self.vertices[vertex_key].get_posy()} for vertex_key in self.vertices.keys()], 
+                                     'posy': self.vertices[vertex_key].get_posy(),
+                                     'is_poi': self.vertices[vertex_key].is_poi(),
+                                     'poi_number': self.vertices[vertex_key].get_poi_number(),
+                                     'is_final_goal': self.vertices[vertex_key].is_final_goal()} for vertex_key in self.vertices.keys()], 
                         'edges': [{'id': self.edges[edge_key].get_id(), 
                                    'start': self.edges[edge_key].get_start(), 
                                    'end': self.edges[edge_key].get_end()} for edge_key in self.edges.keys()]}
@@ -385,12 +416,15 @@ class TopologicalMap:
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
             self.name = data['name']
-            self.vertices = {vertex['id']: Vertex(vertex['id'], vertex['posx'], vertex['posy']) for vertex in data['vertices']}
+            self.vertices = {vertex['id']: Vertex(vertex['id'], vertex['posx'], vertex['posy'], vertex['is_poi'], vertex['poi_number'], vertex['is_final_goal']) for vertex in data['vertices']}
             for edge in data['edges']:
                 start_vertex = self.find_vertex_from_id(edge['start'])
                 end_vertex = self.find_vertex_from_id(edge['end'])
                 self.add_edge_with_id(edge['id'], start_vertex.get_id(), end_vertex.get_id())
             self.compute_edges_from_vertex()
+            self.compute_pois_set()
+            self.compute_final_goal_vertices()
+            # print("final_goal_vertices:", self.final_goal_vertices)
         
 
 
@@ -437,12 +471,12 @@ class TopologicalMap:
 
 
         for vertex_id in self.vertices.keys():
-            if vertex_id in self.goal_vertices:
+            if self.vertices[vertex_id].is_poi():
                 self.ax.plot(self.vertices[vertex_id].get_posx(), self.vertices[vertex_id].get_posy(), 'bo')
             else:
                 self.ax.plot(self.vertices[vertex_id].get_posx(), self.vertices[vertex_id].get_posy(), 'ro')
             if show_vertex_names:
-                self.ax.text(x = self.vertices[vertex_id].get_posx(), y = self.vertices[vertex_id].get_posy(), s = vertex_id, color = "blue")
+                self.ax.text(x = self.vertices[vertex_id].get_posx(), y = self.vertices[vertex_id].get_posy(), s = vertex_id + (f" (POI {self.vertices[vertex_id].get_poi_number()})" if self.vertices[vertex_id].is_poi() else ""), color = "blue")
             # plot a circle around the vertex to show the area in light green
             # circle  = plt.Circle((self.vertices[vertex_id].get_posx(), self.vertices[vertex_id].get_posy()), 1, color='lightgreen')
             # self.ax.add_artist(circle)
