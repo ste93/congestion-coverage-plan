@@ -67,11 +67,23 @@ class DetectionsRetriever:
             self._detections = detections_local
             self._current_occupancies = current_occupancies_local
 
+    def check_for_stale_detections(self):
+        if len(self._detections) > 0:
+            latest_timestamp = max(detections[0].timestamp for detections in self._detections.values())
+            if self._node is not None:
+                current_time = self._node.get_clock().now().to_msg().sec
+                if current_time - latest_timestamp > 5:  # 5 seconds threshold for staleness
+                    with self._lock:
+                        self._detections = {}
+                        self._current_occupancies = {}
+
     def get_detections(self):
+        self.check_for_stale_detections()
         with self._lock:
             return self._detections
 
     def get_current_occupancies(self):
+        self.check_for_stale_detections()
         with self._lock:
             return self._current_occupancies
         
