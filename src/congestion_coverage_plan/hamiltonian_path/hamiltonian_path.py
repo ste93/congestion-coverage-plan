@@ -4,6 +4,7 @@ from congestion_coverage_plan.map_utils.OccupancyMap import OccupancyMap
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 import math
+import datetime
 import numpy as np
 
 def hamilton(graph, start_v):
@@ -89,10 +90,11 @@ def get_solution(manager, routing, solution):
 
 def solve_with_google_with_data_returning_policy(data, vertex_list = None):
     """Entry point of the program."""
+    print("Solving with Google OR-Tools...")
     # Instantiate the data problem.
     # data = create_data_model(occupancy_map, time, initial_vertex_id, distance_matrix_function)
     # print(data)
-
+    initial_time = datetime.datetime.now()
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(
         len(data["distance_matrix"]), data["num_vehicles"], data["depot"]
@@ -168,7 +170,18 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None):
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(previous_index, index, 0)
-        return vertex_list[get_solution(manager, routing, solution)[1][6:]] 
+        print("Solver status: ", routing.status())
+        final_time = datetime.datetime.now()
+        print("Computation time: ", (final_time - initial_time).total_seconds())
+        solution_list = get_solution(manager, routing, solution)
+        print("Solution found: ", solution_list)
+        if vertex_list is not None:
+            policy = []
+            for vertex in vertex_list:
+                if vertex in solution_list:
+                    policy.append(vertex)
+            return policy
+        return solution_list[1] if len(solution_list) > 1 else solution_list[0] if solution_list else None 
         return get_solution(manager, routing, solution)
     else:
         # print("No solution found")
@@ -255,6 +268,7 @@ def solve_with_google_with_data(data):
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(previous_index, index, 0)
+        print("Solver status: ", routing.status())
         return route_distance / 100.0
     else:
         # print("No solution found")
@@ -329,6 +343,7 @@ def solve_with_google(occupancy_map, time, initial_vertex_id, distance_matrix_fu
     # Print solution on console.
     if solution:
         
+        print("Solver status: ", routing.status())
         print_solution(manager, routing, solution)
         # print(routing)
         # print(manager)

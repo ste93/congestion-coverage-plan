@@ -42,7 +42,12 @@ class Simulator:
 
     def calculate_traverse_time(self, state, action):
         occupancies = self.get_current_occupancies(state)
-        edge_name = self._occupancy_map.find_edge_from_position(state.get_vertex(), action).get_id()
+        edge = self._occupancy_map.find_edge_from_position(state.get_vertex(), action)
+        if edge is None:
+            edge = self._occupancy_map.find_edge_from_position(action, state.get_vertex())
+        if edge is None:
+            return 0, 0  # Return default values if edge not found
+        edge_name = edge.get_id()
         edge_occupancy = 0
         if edge_name in occupancies.keys():
             edge_occupancy = occupancies[edge_name]
@@ -85,6 +90,7 @@ class Simulator:
 
 
     def simulate_tsp_current_occupancy_with_replanning(self, start_time, initial_state, time_bound):
+        print("-------------------------------------simulate_tsp_current_occupancy_with_replanning----------------------------------")
         self.set_time_for_occupancies(start_time)
         completed = False
         state = initial_state
@@ -105,13 +111,12 @@ class Simulator:
                 print(state.get_vertex())
                 executed_steps.append(("FAILURE", 0))
                 return (state.get_time(), executed_steps, steps_time)
-            vertices_list = list(self._occupancy_map.get_vertices().keys()) - state.get_visited_vertices() + state.get_vertex()
+            vertices_list = list(set(self._occupancy_map.get_vertices().keys()) - state.get_visited_vertices() | set([state.get_vertex()]))
             map_current_occupancy = hamiltonian_path.create_matrix_from_vertices_list(
                 vertices_ids=vertices_list,
                 occupancy_map=self._occupancy_map,
                 initial_vertex_id=state.get_vertex(),
-                length_function=self._occupancy_map.get_edge_length
-
+                length_function=None
             )
 
             data = create_data_model_from_matrix(map_current_occupancy)

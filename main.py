@@ -1,6 +1,6 @@
 import warnings
 from tqdm import tqdm
-from congestion_coverage_plan.simulator.Simulator import Simulator, simulate_tsp, simulate_lrtdp, simulate_lrtdp_planning_while_moving
+from congestion_coverage_plan.simulator.Simulator import Simulator, simulate_tsp, simulate_lrtdp, simulate_lrtdp_planning_while_moving, simulate_tsp_current_occupancy_with_replanning
 import csv
 from congestion_coverage_plan.map_utils.OccupancyMap import OccupancyMap
 from congestion_coverage_plan.mdp.MDP import State
@@ -34,6 +34,7 @@ def simulate_generic(filename,
     print("run_tsp_bool:", run_tsp_bool)
     print("run_lrtdp_bool:", run_lrtdp_bool)
     print("run_lrtdp_pwm_bool:", run_lrtdp_pwm_bool)
+    print("run_tsp_bool_current_occupancy:", run_tsp_bool_current_occupancy)
     print("convergence_threshold:", convergence_threshold)
     print("wait_time:", wait_time)
     print("heuristic_function:", heuristic_function)
@@ -146,8 +147,9 @@ def simulate_generic(filename,
 
                 with open(filename_tsp_pwm, 'a') as file_tsp_pwm:
                     writer_tsp_pwm = csv.writer(file_tsp_pwm)
+                    print("HERE")
                     print("Simulating TSP with current occupancy for time:", time, "and level:", level_number)
-                    simulate_tsp(simulator=simulator, 
+                    simulate_tsp_current_occupancy_with_replanning(simulator=simulator, 
                                  time=time, 
                                  occupancy_map=occupancy_map, 
                                  initial_state_name=initial_state_name, 
