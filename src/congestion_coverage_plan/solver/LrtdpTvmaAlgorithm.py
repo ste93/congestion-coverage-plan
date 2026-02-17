@@ -13,8 +13,8 @@ class LrtdpTvmaAlgorithm():
                  occupancy_map, 
                  initial_state_name,
                  convergence_threshold, 
-                 time_bound_real, 
-                 planner_time_bound, 
+                 planning_time_bound, 
+                 solution_time_bound, 
                  time_for_occupancies, 
                  time_start , 
                  wait_time, 
@@ -38,8 +38,8 @@ class LrtdpTvmaAlgorithm():
                                    0,
                                     set([initial_state_name]))
         self.vinitStateName = initial_state_name
-        self.time_bound_real = time_bound_real
-        self.planner_time_bound = planner_time_bound
+        self.planning_time_bound = planning_time_bound
+        self.solution_time_bound = solution_time_bound
         self.convergenceThresholdGlobal = convergence_threshold
         self.policy = {}
         self.valueFunction = {}
@@ -72,7 +72,7 @@ class LrtdpTvmaAlgorithm():
         current_action_cost = 0
         future_actions_cost = 0
 
-        possible_transitions = self.mdp.get_possible_transitions_from_action(state, action, self.planner_time_bound)
+        possible_transitions = self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound)
 
         for transition in possible_transitions:
 
@@ -191,14 +191,14 @@ class LrtdpTvmaAlgorithm():
         while open != []:
             state = open.pop()
             closed.append(state)
-            if self.residual(state) > thetaparameter: # or state.get_time() > self.planner_time_bound:
+            if self.residual(state) > thetaparameter: # or state.get_time() > self.solution_time_bound:
                 solved_condition = False
                 continue
 
             action = self.greedy_action(state)[2] # get the greedy action for the state            
-            for transition in self.mdp.get_possible_transitions_from_action(state, action, self.planner_time_bound):
+            for transition in self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound):
                 next_state = self.mdp.compute_next_state(state, transition)
-                if not (next_state in open or next_state in closed) and not self.solved(next_state): # and not self.goal(state): # and next_state.get_time() <= self.planner_time_bound: # and not self.goal(next_state):
+                if not (next_state in open or next_state in closed) and not self.solved(next_state): # and not self.goal(state): # and next_state.get_time() <= self.solution_time_bound: # and not self.goal(next_state):
                     open.append(next_state)
         if solved_condition:
             for state in closed:
@@ -213,7 +213,7 @@ class LrtdpTvmaAlgorithm():
     def calculate_most_probable_transition(self, state, action):
         most_probable_transitions = []
 
-        for transition in self.mdp.get_possible_transitions_from_action(state, action, self.planner_time_bound):
+        for transition in self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound):
             if transition.get_probability() > 0:
                 if most_probable_transitions == []:
                     most_probable_transitions.append(transition)
@@ -243,7 +243,7 @@ class LrtdpTvmaAlgorithm():
 
     def lrtdp_tvma(self):
         number_of_trials = 0
-        self.occupancy_map.predict_occupancies(self.time_for_occupancies, self.time_for_occupancies + self.planner_time_bound)
+        self.occupancy_map.predict_occupancies(self.time_for_occupancies, self.time_for_occupancies + self.solution_time_bound)
         self.occupancy_map.calculate_current_occupancies(self.time_for_occupancies)
         initial_current_time = datetime.datetime.now()
         # for edge_id in self.occupancy_map.get_edges().keys():
@@ -252,14 +252,14 @@ class LrtdpTvmaAlgorithm():
         # if occ is not None:
         #     print("Edge: ", edge_id, "occupancy levels: ", occ)
             # print("Edge: ", edge_id, "occupancy levels: ", occ)
-        print("LRTDP TVMA started at: ", initial_current_time, "convergence threshold:", self.convergenceThresholdGlobal, "wait_time:", self._wait_time, "planner time bound:", self.planner_time_bound, "real time bound:", self.time_bound_real, "initial time for occupancies:", self.time_for_occupancies)
+        print("LRTDP TVMA started at: ", initial_current_time, "convergence threshold:", self.convergenceThresholdGlobal, "wait_time:", self._wait_time, "planner time bound:", self.solution_time_bound, "real time bound:", self.planning_time_bound, "initial time for occupancies:", self.time_for_occupancies)
         average_trial_time = 0
         old_policy = None
         old_time = None
-        while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.time_bound_real):
+        while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.planning_time_bound):
             time_init_trial = datetime.datetime.now()
             # print("Trial number: ", number_of_trials)
-            self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.planner_time_bound)
+            self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.solution_time_bound)
             # print(self.valueFunction)
             # print(self.policy)
             # for item in self.policy.keys():
@@ -286,7 +286,7 @@ class LrtdpTvmaAlgorithm():
         return self.solved(self.vinitState)
 
 
-    def lrtdp_tvma_trial(self, vinitStateParameter, thetaparameter, planner_time_bound):
+    def lrtdp_tvma_trial(self, vinitStateParameter, thetaparameter, solution_time_bound):
             # print("trial started")
             visited = [] # this is a stack
             state = vinitStateParameter
@@ -296,7 +296,7 @@ class LrtdpTvmaAlgorithm():
                 visited.append(state)
                 self.update(state)
                 self.policy[state.to_string()] = self.calculate_argmin_Q(state)
-                if self.goal(state) or (state.get_time() > planner_time_bound):
+                if self.goal(state) or (state.get_time() > solution_time_bound):
                     ######## should there be here a bellamn backup?
                     break
                 # perform bellman backup and update policy
@@ -307,7 +307,7 @@ class LrtdpTvmaAlgorithm():
                 # print("action: ", self.policy[state.to_string()][2])
                 time_initial = datetime.datetime.now()
                 action = self.policy[state.to_string()][2]
-                transitions = self.mdp.get_possible_transitions_from_action(state, action, self.planner_time_bound)
+                transitions = self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound)
                 if not transitions:
                     print("lrtdp_tvma_trial::No transitions found for state: ", state.to_string())
                     break

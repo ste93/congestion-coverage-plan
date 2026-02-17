@@ -12,25 +12,38 @@ from congestion_coverage_plan.utils import Logger
 from congestion_coverage_plan.hamiltonian_path.hamiltonian_path import * 
 
 
+# class Configuration:
+#     def __init__(self):
+#         self.writer_tsp = None
+#         self.writer_lrtdp = None
+#         self.writer_lrtdp_pwm = None
+#         self.writer_tsp_pwm = None
+#         self.times = []
+#         self.heuristic_function = ""
+#         self.
+#         self.logger = None
+
+
 def simulate_generic(filename, 
                      time_list, 
                      initial_state_name, 
                      predictor_creator_function, 
-                     time_bound_lrtdp, 
-                     time_bound_real, 
+                     solution_time_bound, 
+                     planning_time_bound, 
                      run_tsp_bool, 
                      run_lrtdp_bool, 
                      run_lrtdp_pwm_bool, 
-                    run_tsp_bool_current_occupancy,
+                     run_tsp_bool_current_occupancy,
                      convergence_threshold, 
                      wait_time, 
-                     heuristic_function):
+                     heuristic_function,
+                     explain_time):
     print("arguments:")
     print("filename:", filename)
     print("time_list:", time_list)
     print("initial_state_name:", initial_state_name)
-    print("time_bound_lrtdp:", time_bound_lrtdp)
-    print("time_bound_real:", time_bound_real)
+    print("solution_time_bound:", solution_time_bound)
+    print("planning_time_bound:", planning_time_bound)
     print("run_tsp_bool:", run_tsp_bool)
     print("run_lrtdp_bool:", run_lrtdp_bool)
     print("run_lrtdp_pwm_bool:", run_lrtdp_pwm_bool)
@@ -38,6 +51,7 @@ def simulate_generic(filename,
     print("convergence_threshold:", convergence_threshold)
     print("wait_time:", wait_time)
     print("heuristic_function:", heuristic_function)
+    print("explain_time:", explain_time)
 
     warnings.filterwarnings("ignore")
     folder = 'results/' + filename.split("/")[-1].split(".")[0]
@@ -47,17 +61,18 @@ def simulate_generic(filename,
     # occupancy_map.load_occupancy_map(filename+ "_" + str(2) + "_levels.yaml")
     # occupancy_map.plot_topological_map(predictor.map_file, predictor.fig_size, occupancy_map.get_name())
     # simulator = Simulator(occupancy_map, 0)
-    # simulate_lrtdp(simulator, time_list[0], occupancy_map, initial_state_name, None, None, time_bound_lrtdp)
+    # simulate_lrtdp(simulator, time_list[0], occupancy_map, initial_state_name, None, None, solution_time_bound)
     writer_tsp = None
     writer_lrtdp = None
     writer_lrtdp_pwm = None
     writer_tsp_pwm = None
     # create files for results
     logger = Logger.Logger(print_time_elapsed=False)
-    filename_tsp_pwm = folder + "/" + filename.split("/")[-1].split(".")[0] + '_tsp_pwm_current_occupancy.csv'
-    filename_tsp = folder + "/" + filename.split("/")[-1].split(".")[0] + '_tsp.csv'
-    filename_lrtdp = folder + "/" + filename.split("/")[-1].split(".")[0] + "_" + str(time_bound_real) +  "_" + str(time_bound_lrtdp) + "_" + str(convergence_threshold).replace(".", "-")  + "_" + str(wait_time) + "_" + heuristic_function + '_lrtdp.csv'
-    filename_lrtdp_pwm = folder + "/" + filename.split("/")[-1].split(".")[0] + "_" + str(time_bound_real) +"_" + str(time_bound_lrtdp) + "_" + str(convergence_threshold).replace(".", "-")  + "_" + str(wait_time)  + "_" + heuristic_function + '_lrtdp_pwm.csv'
+    values_used_as_string = "_ptb_" + str(planning_time_bound) +  "_stb_" + str(solution_time_bound) + "_ctr_" + str(convergence_threshold).replace(".", "-")  + "_wtt_" + str(wait_time)  + "_heu_" + heuristic_function + "_expl_" + str(explain_time) + "_"
+    filename_tsp = folder + "/" + filename.split("/")[-1].split(".")[0] + "-tsp-" + values_used_as_string + '.csv'
+    filename_tsp_pwm = folder + "/" + filename.split("/")[-1].split(".")[0] + "-tsp_pwm-" + values_used_as_string + '.csv'
+    filename_lrtdp = folder + "/" + filename.split("/")[-1].split(".")[0] + "-lrtdp-" + values_used_as_string + '.csv'
+    filename_lrtdp_pwm = folder + "/" + filename.split("/")[-1].split(".")[0] + "-lrtdp_pwm-" + values_used_as_string + '.csv'
     if run_tsp_bool:
         with open(filename_tsp, 'w') as file_tsp:
             writer_tsp = csv.writer(file_tsp)
@@ -81,7 +96,12 @@ def simulate_generic(filename,
                 occupancy_map = OccupancyMap(predictor)
                 occupancy_map.set_logger(logger)
                 occupancy_map.load_occupancy_map(filename+ "_" + str(level_number) + "_levels.yaml")
-                simulator = Simulator(occupancy_map, 0, wait_time, time_bound_real)
+                simulator = Simulator(occupancy_map=occupancy_map, 
+                                      time_for_occupancies=0, 
+                                      wait_time=wait_time, 
+                                      planning_time_bound=planning_time_bound, 
+                                      solution_time_bound=solution_time_bound, 
+                                      explain_time=explain_time)
 
                 with open(filename_tsp, 'a') as file_tsp:
                     writer_tsp = csv.writer(file_tsp)
@@ -91,8 +111,7 @@ def simulate_generic(filename,
                                  occupancy_map=occupancy_map, 
                                  initial_state_name=initial_state_name, 
                                  writer=writer_tsp, 
-                                 file=file_tsp, 
-                                 time_bound=time_bound_real)
+                                 file=file_tsp)
 
 
             if run_lrtdp_bool:
@@ -100,7 +119,12 @@ def simulate_generic(filename,
                 occupancy_map = OccupancyMap(predictor)
                 occupancy_map.set_logger(logger)
                 occupancy_map.load_occupancy_map(filename+ "_" + str(level_number) + "_levels.yaml")
-                simulator = Simulator(occupancy_map, 0, wait_time, time_bound_real)
+                simulator = Simulator(occupancy_map=occupancy_map, 
+                                      time_for_occupancies=0, 
+                                      wait_time=wait_time, 
+                                      planning_time_bound=planning_time_bound, 
+                                      solution_time_bound=solution_time_bound, 
+                                      explain_time=explain_time)
                 with open(filename_lrtdp, 'a') as file_lrtdp:
                     writer_lrtdp = csv.writer(file_lrtdp)
                     print("Simulating LRTDP TVMA for time:", time, "and level:", level_number)
@@ -110,7 +134,6 @@ def simulate_generic(filename,
                                    initial_state_name=initial_state_name, 
                                    writer=writer_lrtdp, 
                                    file=file_lrtdp, 
-                                   planner_time_bound=time_bound_lrtdp, 
                                    logger=logger, 
                                    convergence_threshold=convergence_threshold,
                                    heuristic_function=heuristic_function)
@@ -122,7 +145,12 @@ def simulate_generic(filename,
                 occupancy_map.set_logger(logger)
                 occupancy_map.load_occupancy_map(filename+ "_" + str(level_number) + "_levels.yaml")
                 # occupancy_map.plot_topological_map(predictor.map_file, predictor.fig_size, occupancy_map.get_name())
-                simulator = Simulator(occupancy_map, 0, wait_time, time_bound_real)
+                simulator = Simulator(occupancy_map=occupancy_map, 
+                                      time_for_occupancies=0, 
+                                      wait_time=wait_time, 
+                                      planning_time_bound=planning_time_bound,
+                                      solution_time_bound=solution_time_bound,
+                                      explain_time=explain_time)
                 with open(filename_lrtdp_pwm, 'a') as file_lrtdp_pwm:
                     writer_lrtdp_pwm = csv.writer(file_lrtdp_pwm)
                     print("Simulating LRTDP TVMA while moving for time:", time, "and level:", level_number)
@@ -132,7 +160,6 @@ def simulate_generic(filename,
                                                            initial_state_name=initial_state_name, 
                                                            writer=writer_lrtdp_pwm, 
                                                            file=file_lrtdp_pwm, 
-                                                           planner_time_bound=time_bound_lrtdp, 
                                                            logger=logger, 
                                                            convergence_threshold=convergence_threshold, 
                                                            heuristic_function=heuristic_function)
@@ -143,7 +170,12 @@ def simulate_generic(filename,
                 occupancy_map = OccupancyMap(predictor)
                 occupancy_map.set_logger(logger)
                 occupancy_map.load_occupancy_map(filename+ "_" + str(level_number) + "_levels.yaml")
-                simulator = Simulator(occupancy_map, 0, wait_time, time_bound_real)
+                simulator = Simulator(occupancy_map=occupancy_map, 
+                                      time_for_occupancies=0, 
+                                      wait_time=wait_time, 
+                                      planning_time_bound=planning_time_bound,
+                                      solution_time_bound=solution_time_bound,
+                                      explain_time=explain_time)
 
                 with open(filename_tsp_pwm, 'a') as file_tsp_pwm:
                     writer_tsp_pwm = csv.writer(file_tsp_pwm)
@@ -154,8 +186,7 @@ def simulate_generic(filename,
                                  occupancy_map=occupancy_map, 
                                  initial_state_name=initial_state_name, 
                                  writer=writer_tsp_pwm, 
-                                 file=file_tsp_pwm, 
-                                 time_bound=time_bound_real)
+                                 file=file_tsp_pwm)
 
 def get_times_atc():
     time_list = []
@@ -226,8 +257,8 @@ def get_times_atc():
 
 
 def create_atc_with_name(filename, 
-                         time_bound_lrtdp, 
-                         time_bound_real, 
+                         solution_time_bound, 
+                         planning_time_bound, 
                          run_tsp_bool, 
                          run_lrtdp_bool, 
                          run_lrtdp_pwm_bool, 
@@ -235,6 +266,7 @@ def create_atc_with_name(filename,
                          convergence_threshold,
                          wait_time,
                          heuristic_function, 
+                         explain_time,
                          times = None):
     time_list = []
     if times is not None:
@@ -248,19 +280,20 @@ def create_atc_with_name(filename,
                      time_list=time_list, 
                      initial_state_name=initial_state_name, 
                      predictor_creator_function=predictor_creator_function, 
-                     time_bound_lrtdp=time_bound_lrtdp, 
-                     time_bound_real=time_bound_real, 
+                     solution_time_bound=solution_time_bound, 
+                     planning_time_bound=planning_time_bound, 
                      run_tsp_bool=run_tsp_bool, 
                      run_lrtdp_bool=run_lrtdp_bool, 
                      run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, 
                      run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
                      convergence_threshold=convergence_threshold, 
                      wait_time=wait_time,
-                     heuristic_function=heuristic_function)
+                     heuristic_function=heuristic_function,
+                     explain_time=explain_time)
 
 def create_madama_with_name(filename, 
-                         time_bound_lrtdp, 
-                         time_bound_real, 
+                         solution_time_bound, 
+                         planning_time_bound, 
                          run_tsp_bool, 
                          run_lrtdp_bool, 
                          run_lrtdp_pwm_bool, 
@@ -268,6 +301,7 @@ def create_madama_with_name(filename,
                          convergence_threshold,
                          wait_time,
                          heuristic_function,
+                         explain_time,
                          times = None):
     time_list = []
     with open('data/datasets/madama/madama_reduced_decimals.csv', 'r') as file:
@@ -283,30 +317,31 @@ def create_madama_with_name(filename,
     initial_state_name = "vertex1"
     print("Selected times:", selected_time_list)
     predictor_creator_function = create_madama_cliff_predictor
-    # simulate_generic(filename, [0], initial_state_name, predictor_creator_function, time_bound_lrtdp, run_tsp_bool, run_lrtdp_bool, run_lrtdp_pwm_bool, convergence_threshold)
+    # simulate_generic(filename, [0], initial_state_name, predictor_creator_function, solution_time_bound, run_tsp_bool, run_lrtdp_bool, run_lrtdp_pwm_bool, convergence_threshold)
     simulate_generic(filename=filename, 
                      time_list= selected_time_list, 
                      initial_state_name=initial_state_name, 
                      predictor_creator_function=predictor_creator_function, 
-                     time_bound_lrtdp=time_bound_lrtdp, 
-                     time_bound_real=time_bound_real, 
+                     solution_time_bound=solution_time_bound, 
+                     planning_time_bound=planning_time_bound, 
                      run_tsp_bool=run_tsp_bool, 
                      run_lrtdp_bool=run_lrtdp_bool, 
                      run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, 
                      run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
                      convergence_threshold=convergence_threshold, 
                      wait_time=wait_time,
-                     heuristic_function=heuristic_function)
+                     heuristic_function=heuristic_function,
+                     explain_time=explain_time)
 
 def print_usage():
     print("")
     print("Usage: python main.py show <occupancy_map_file> [--show_vertex_names] or")
     print("python main.py save <occupancy_map_file> [--show_vertex_names] or")
-    print("python main.py run --map <map_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --time_bound_lrtdp [time_bound_lrtdp] --time_bound_real [time_bound_real]")
-    print("Example: python main.py run --map atc_corridor_11 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py run --map madama_21 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py run --map madama_21 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 10 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py run --map atc_corridor_11 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 1 --time_bound_lrtdp 350 --time_bound_real 10000")
+    print("python main.py run --map <map_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --solution_time_bound [solution_time_bound] --planning_time_bound [planning_time_bound]")
+    print("Example: python main.py run --map atc_corridor_11 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --solution_time_bound 350 --planning_time_bound 10000")
+    print("Example: python main.py run --map madama_21 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --solution_time_bound 350 --planning_time_bound 10000")
+    print("Example: python main.py run --map madama_21 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 10 --solution_time_bound 350 --planning_time_bound 10000")
+    print("Example: python main.py run --map atc_corridor_11 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 1 --solution_time_bound 350 --planning_time_bound 10000")
     print("Example: python main.py show --map atc_corridor_11 --show_vertex_names")
     print("Example: python main.py save --map atc_corridor_11 --show_vertex_names")
     print("occupancy_map_file is one of the files in data")
@@ -363,7 +398,7 @@ if __name__ == "__main__":
     # param parser, optins are:
     # show <occupancy_map_file> [show_vertex_names]
     # save <occupancy_map_file> [show_vertex_names]
-    # run <function_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --time_bound_lrtdp [time_bound_lrtdp] --time_bound_real [time_bound_real]
+    # run <function_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --solution_time_bound [solution_time_bound] --planning_time_bound [planning_time_bound]
     # occupancy_map_file is one of the files in data
     # function_name is one of the functions defined below
     # tsp, lrtdp, lrtdp_pwm are optional, if not provided, all algorithms will be run
@@ -384,8 +419,9 @@ if __name__ == "__main__":
         run_tsp_bool_current_occupancy = False
         convergence_threshold = 2.5
         wait_time = 10
-        time_bound_lrtdp = 350
-        time_bound_real = 300
+        explain_time = 0
+        solution_time_bound = 350
+        planning_time_bound = 300
         times = None
         if "--algorithms" in args:
             print("Algorithms specified.")
@@ -397,7 +433,7 @@ if __name__ == "__main__":
                     run_lrtdp_bool = True
                 elif alg == "lrtdp_pwm":
                     run_lrtdp_pwm_bool = True
-                elif alg == "tsp_pwm_current_occupancy":
+                elif alg == "tsp_pwm":
                     run_tsp_bool_current_occupancy = True
                 else:
                     break
@@ -418,15 +454,20 @@ if __name__ == "__main__":
             if wait_time_index + 1 < len(args):
                 wait_time = int(args[wait_time_index + 1])
         
-        if "--time_bound_lrtdp" in args:
-            time_bound_lrtdp_index = args.index("--time_bound_lrtdp")
-            if time_bound_lrtdp_index + 1 < len(args):
-                time_bound_lrtdp = int(args[time_bound_lrtdp_index + 1])
+        if "--explain_time" in args:
+            explain_time_index = args.index("--explain_time")
+            if explain_time_index + 1 < len(args):
+                explain_time = int(args[explain_time_index + 1])
 
-        if "--time_bound_real" in args:
-            time_bound_real_index = args.index("--time_bound_real")
-            if time_bound_real_index + 1 < len(args):
-                time_bound_real = int(args[time_bound_real_index + 1])
+        if "--solution_time_bound" in args:
+            solution_time_bound_index = args.index("--solution_time_bound")
+            if solution_time_bound_index + 1 < len(args):
+                solution_time_bound = int(args[solution_time_bound_index + 1])
+
+        if "--planning_time_bound" in args:
+            planning_time_bound_index = args.index("--planning_time_bound")
+            if planning_time_bound_index + 1 < len(args):
+                planning_time_bound = int(args[planning_time_bound_index + 1])
         
         if "--times" in args:
             times_index = args.index("--times")
@@ -457,19 +498,21 @@ if __name__ == "__main__":
         arg = map_name
         if "atc" in map_name:
             create_atc_with_name(filename=path, 
-                                 time_bound_lrtdp=time_bound_lrtdp, 
-                                 time_bound_real=time_bound_real,
+                                 solution_time_bound=solution_time_bound, 
+                                 planning_time_bound=planning_time_bound,
                                  run_tsp_bool=run_tsp_bool, run_lrtdp_bool=run_lrtdp_bool, run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
                                  convergence_threshold=convergence_threshold, wait_time=wait_time,
                                  heuristic_function=heuristic_function,
-                                 times=times)
+                                 times=times, 
+                                 explain_time=explain_time)
         elif "madama" in map_name:
             create_madama_with_name(filename=path, 
-                                    time_bound_lrtdp=time_bound_lrtdp, 
-                                    time_bound_real=time_bound_real,
+                                    solution_time_bound=solution_time_bound, 
+                                    planning_time_bound=planning_time_bound,
                                     run_tsp_bool=run_tsp_bool, run_lrtdp_bool=run_lrtdp_bool, run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
                                     convergence_threshold=convergence_threshold, wait_time=wait_time, heuristic_function=heuristic_function,
-                                    times=times)
+                                    times=times, 
+                                    explain_time=explain_time)
         else:
             print("Function not found: ", arg)
             print_usage()

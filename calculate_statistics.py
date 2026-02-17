@@ -11,7 +11,7 @@ def get_time(row):
     # row = float(row)
 
     # return eval(row)
-labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm"]
+labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm", "steps_tsp_current_occupancy_with_replanning"]
 levels = [2,5,8]
 
 
@@ -118,7 +118,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     collisions = {}
     # labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm"]
     num_rows = len(labels)
-    num_tsp_rows = 4
+    num_tsp_rows = 1
     for label in labels:
         execution_time[label] = {}
         cpu_time[label] = {}
@@ -201,7 +201,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         min_time = 99999999
         min_collisions_tsp = 9999999
         print("Processing tsp rows", row_id * 4, "to", row_id + num_tsp_rows - 1)
-        for tsp_row_id in range(row_id * 4, row_id * 4 + num_tsp_rows):
+        for tsp_row_id in range(row_id, row_id + num_tsp_rows):
             if get_time(data_tsp[tsp_row_id][2]) < min_time:
                 min_time = get_time(data_tsp[tsp_row_id][2])
 
@@ -288,6 +288,8 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         print("Average number of collisions for tsp max level", i, np.mean(collisions["steps_max"][str(i)]))
         print("Average number of collisions for tsp curr level", i, np.mean(collisions["steps_curr"][str(i)]))
         print("Average number of collisions for lrtdp level", i, np.mean(collisions["steps_lrtdp"][str(i)]))
+        print("Average number of collisions for tsp current occupancy with replanning level", i, np.mean(collisions["steps_tsp_current_occupancy_with_replanning"][str(i)]))
+        print("p-value for execution time lrtdp vs tsp current occupancy with replanning level", i, mannwhitneyu( execution_time["steps_lrtdp"][str(i)], execution_time["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')[1])
 
     print("---- DONE CALCULATING STATISTICS ----")
     print("Number of times lrtdp was faster than tsp:", lrtdp_count)
@@ -408,6 +410,8 @@ if __name__ == '__main__':
     if sys.argv[1] == "statistics":
         if len(sys.argv) < 5:
             print("Usage: python calculate_statistics.py statistics <csv_file_tsp> <max_levels>")
+            print("or: python calculate_statistics.py statistics <csv_file_tsp> <csv_file_lrtdp> <max_levels>")
+
             sys.exit(1)
         if len(sys.argv) < 6:
             print("No lrtdp pwm file provided")
