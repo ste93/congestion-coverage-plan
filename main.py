@@ -37,7 +37,8 @@ def simulate_generic(filename,
                      convergence_threshold, 
                      wait_time, 
                      heuristic_function,
-                     explain_time):
+                     explain_time, 
+                     output_folder = None):
     print("arguments:")
     print("filename:", filename)
     print("time_list:", time_list)
@@ -52,9 +53,11 @@ def simulate_generic(filename,
     print("wait_time:", wait_time)
     print("heuristic_function:", heuristic_function)
     print("explain_time:", explain_time)
-
+    base_folder = "results"
     warnings.filterwarnings("ignore")
-    folder = 'results/' + filename.split("/")[-1].split(".")[0]
+    if output_folder is not None:
+        base_folder = output_folder
+    folder = base_folder + '/' + filename.split("/")[-1].split(".")[0]
     dataset_utils.create_folder(folder)
     # predictor = predictor_creator_function()
     # occupancy_map = OccupancyMap(predictor)
@@ -267,6 +270,7 @@ def create_atc_with_name(filename,
                          wait_time,
                          heuristic_function, 
                          explain_time,
+                         output_folder = None,
                          times = None):
     time_list = []
     if times is not None:
@@ -289,7 +293,8 @@ def create_atc_with_name(filename,
                      convergence_threshold=convergence_threshold, 
                      wait_time=wait_time,
                      heuristic_function=heuristic_function,
-                     explain_time=explain_time)
+                     explain_time=explain_time,
+                     output_folder=output_folder)
 
 def create_madama_with_name(filename, 
                          solution_time_bound, 
@@ -302,6 +307,7 @@ def create_madama_with_name(filename,
                          wait_time,
                          heuristic_function,
                          explain_time,
+                         output_folder = None,
                          times = None):
     time_list = []
     with open('data/datasets/madama/madama_reduced_decimals.csv', 'r') as file:
@@ -331,7 +337,8 @@ def create_madama_with_name(filename,
                      convergence_threshold=convergence_threshold, 
                      wait_time=wait_time,
                      heuristic_function=heuristic_function,
-                     explain_time=explain_time)
+                     explain_time=explain_time,
+                     output_folder=output_folder)
 
 def print_usage():
     print("")
@@ -492,6 +499,21 @@ if __name__ == "__main__":
             print_usage()
             sys.exit(1)
 
+
+        if "--results_folder" in args:
+            results_folder_index = args.index("--results_folder")
+            if results_folder_index + 1 < len(args):
+                results_folder = args[results_folder_index + 1]
+                # Logger.set_results_folder(results_folder)
+            else:
+                print("Error: --results_folder option requires a value.")
+                print_usage()
+                sys.exit(1)
+        else:
+            print("No results folder specified, need to specify one with --results_folder [folder_name]")
+            print_usage()
+            sys.exit(1)
+
         print(times)
         path = "data/occupancy_maps/occupancy_maps_" + map_name + "/occupancy_map_" + map_name
 
@@ -500,19 +522,29 @@ if __name__ == "__main__":
             create_atc_with_name(filename=path, 
                                  solution_time_bound=solution_time_bound, 
                                  planning_time_bound=planning_time_bound,
-                                 run_tsp_bool=run_tsp_bool, run_lrtdp_bool=run_lrtdp_bool, run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
-                                 convergence_threshold=convergence_threshold, wait_time=wait_time,
+                                 run_tsp_bool=run_tsp_bool, 
+                                 run_lrtdp_bool=run_lrtdp_bool, 
+                                 run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, 
+                                 run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
+                                 convergence_threshold=convergence_threshold, 
+                                 wait_time=wait_time,
                                  heuristic_function=heuristic_function,
                                  times=times, 
-                                 explain_time=explain_time)
+                                 explain_time=explain_time,
+                                 output_folder=results_folder)
         elif "madama" in map_name:
             create_madama_with_name(filename=path, 
                                     solution_time_bound=solution_time_bound, 
                                     planning_time_bound=planning_time_bound,
-                                    run_tsp_bool=run_tsp_bool, run_lrtdp_bool=run_lrtdp_bool, run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
-                                    convergence_threshold=convergence_threshold, wait_time=wait_time, heuristic_function=heuristic_function,
+                                    run_tsp_bool=run_tsp_bool, 
+                                    run_lrtdp_bool=run_lrtdp_bool, 
+                                    run_lrtdp_pwm_bool=run_lrtdp_pwm_bool, 
+                                    run_tsp_bool_current_occupancy=run_tsp_bool_current_occupancy,
+                                    convergence_threshold=convergence_threshold, wait_time=wait_time, 
+                                    heuristic_function=heuristic_function,
                                     times=times, 
-                                    explain_time=explain_time)
+                                    explain_time=explain_time,
+                                    output_folder=results_folder)
         else:
             print("Function not found: ", arg)
             print_usage()

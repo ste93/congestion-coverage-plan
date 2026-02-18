@@ -36,7 +36,7 @@ class LrtdpTvmaAlgorithm():
         else:
             self.vinitState = State(initial_state_name, 
                                    0,
-                                    set([initial_state_name]))
+                                    set([initial_state_name]), None)
         self.vinitStateName = initial_state_name
         self.planning_time_bound = planning_time_bound
         self.solution_time_bound = solution_time_bound
@@ -104,7 +104,7 @@ class LrtdpTvmaAlgorithm():
 
     def calculate_argmin_Q(self, state):
         qvalues = []
-        state_internal = State(state.get_vertex(), state.get_time(), state.get_visited_vertices().copy())
+        state_internal = State(state.get_vertex(), state.get_time(), state.get_visited_vertices().copy(), state.get_last_action())
         time_initial = datetime.datetime.now()
         possible_actions = self.mdp.get_possible_actions(state_internal)
         if not possible_actions:

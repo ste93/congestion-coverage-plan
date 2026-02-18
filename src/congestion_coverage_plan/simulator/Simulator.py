@@ -28,9 +28,9 @@ class Simulator:
     def execute_step(self,state, action):
         if action == "wait":
             # state, collisions, traverse_time
-            return State(state.get_vertex(), state.get_time() + self._wait_time, state.get_visited_vertices().copy()), 0, self._wait_time
+            return State(state.get_vertex(), state.get_time() + self._wait_time, state.get_visited_vertices().copy(), "wait"), 0, self._wait_time
         if action == "explain":
-            return State(state.get_vertex(), state.get_time() + self._explain_time, state.get_visited_vertices().copy()), 0, self._explain_time
+            return State(state.get_vertex(), state.get_time() + self._explain_time, state.get_visited_vertices().copy(), "explain"), 0, self._explain_time
         calculated_traverse_time, collisions = self.calculate_traverse_time(state, action)
 
         next_time = state.get_time() + calculated_traverse_time
@@ -39,7 +39,7 @@ class Simulator:
         visited_vertices = state.get_visited_vertices().copy()
         if next_vertex not in state.get_visited_vertices():
             visited_vertices.add(next_vertex)
-        next_state = State(next_vertex, next_time, visited_vertices)
+        next_state = State(next_vertex, next_time, visited_vertices, action)
         print(f"execute step from {state.get_vertex()} to {action}, traverse time: {calculated_traverse_time}, collisions: {collisions}, next state: {next_state}")
         return next_state, collisions, calculated_traverse_time
         
@@ -88,7 +88,7 @@ class Simulator:
                 vertices_list = state.get_visited_vertices()
                 vertices_list.add(vertex_name)
 
-                state = State(vertex_name, state.get_time(), vertices_list)
+                state = State(vertex_name, state.get_time(), vertices_list, state.get_last_action())
             prev_step = vertex_name
         return (state.get_time(), steps, steps_time)
 
@@ -290,7 +290,7 @@ def simulate_tsp_with_policy(simulator, time, occupancy_map,  initial_state_name
     initial_time = datetime.now()
     steps = simulator.simulate_tsp(time, State(initial_state_name,
                 0, 
-                set([initial_state_name])),
+                set([initial_state_name]), None),
                 policy)
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_with_policy", steps[0], len(steps[1]), time_used, 0, [float(time_used.total_seconds())], len(occupancy_map.get_occupancy_levels())])
@@ -302,7 +302,7 @@ def simulate_tsp(simulator, time, occupancy_map,  initial_state_name, writer, fi
     initial_time = datetime.now()
     steps_curr = simulator.simulate_tsp_generic(time, State(initial_state_name,
                 0, 
-                set([initial_state_name])),
+                set([initial_state_name]), None),
                 create_matrix_from_occupancy_map_current_occupancy)
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_curr", steps_curr[0], steps_curr[1], time_used, steps_curr[2], [float(time_used.total_seconds())], len(occupancy_map.get_occupancy_levels())])
@@ -312,7 +312,7 @@ def simulate_tsp(simulator, time, occupancy_map,  initial_state_name, writer, fi
     initial_time = datetime.now()
     steps_avg = simulator.simulate_tsp_generic(time, State(initial_state_name, 
                     0, 
-                    set([initial_state_name])),
+                    set([initial_state_name]), None),
                     create_matrix_from_occupancy_map_medium_occupancy)
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_avg", steps_avg[0], steps_avg[1], time_used, steps_avg[2], [float(time_used.total_seconds())], len(occupancy_map.get_occupancy_levels())])
@@ -322,7 +322,7 @@ def simulate_tsp(simulator, time, occupancy_map,  initial_state_name, writer, fi
     initial_time = datetime.now()
     steps_max = simulator.simulate_tsp_generic(time, State(initial_state_name, 
                     0,
-                    set([initial_state_name])),
+                    set([initial_state_name]), None),
                     create_matrix_from_occupancy_map_high_occupancy)
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_max", steps_max[0], steps_max[1], time_used, steps_max[2], [float(time_used.total_seconds())], len(occupancy_map.get_occupancy_levels())])
@@ -332,7 +332,7 @@ def simulate_tsp(simulator, time, occupancy_map,  initial_state_name, writer, fi
     initial_time = datetime.now()
     steps_min = simulator.simulate_tsp_generic(time, State(initial_state_name, 
                     0,
-                    set([initial_state_name])),
+                    set([initial_state_name]), None),
                     create_matrix_from_occupancy_map_length)
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_min", steps_min[0], steps_min[1], time_used, steps_min[2], [float(time_used.total_seconds())], len(occupancy_map.get_occupancy_levels())])
@@ -345,7 +345,7 @@ def simulate_tsp_current_occupancy_with_replanning(simulator, time, occupancy_ma
     steps_tsp_current_occupancy_with_replanning = simulator.simulate_tsp_current_occupancy_with_replanning(time, 
                                                                                                             State(initial_state_name, 
                                                                                                                 0, 
-                                                                                                                set([initial_state_name]))
+                                                                                                                set([initial_state_name]), None)
                                                                                                             )
     print("=====================================end tsp_current_occupancy_with_replanning==============================")
     time_used = datetime.now() - initial_time
@@ -359,7 +359,7 @@ def simulate_lrtdp(simulator, time, occupancy_map,  initial_state_name, writer, 
     steps_lrtdp = simulator.simulate_lrtdp(time, 
                                            State(initial_state_name, 
                                                 0, 
-                                                set([initial_state_name])), 
+                                                set([initial_state_name]), None),
                                             convergence_threshold,
                                             logger, 
                                             simulate_planning_while_moving=False,
@@ -376,7 +376,7 @@ def simulate_lrtdp_planning_while_moving(simulator, time, occupancy_map,  initia
     steps_lrtdp = simulator.simulate_lrtdp(time, 
                                            State(initial_state_name, 
                                                 0, 
-                                                set([initial_state_name])), 
+                                                set([initial_state_name]), None),
                                             convergence_threshold,
                                             logger,
                                             simulate_planning_while_moving=True,
