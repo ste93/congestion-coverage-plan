@@ -44,7 +44,8 @@ class CliffPredictor:
         plt.imshow(img, cmap='gray', vmin=0, vmax=255, extent=self.fig_size)
         Plotter.plot_cliff_map(self.cliff_map_data)
         name = self.mod_file.split("/")[-1].split(".")[0]
-        plt.savefig(f"{name}_cliff_map.png")
+        plt.savefig(f"{name}_cliff_map.png", dpi=400)
+
         plt.show()
 
     def display_cliff_map_with_prediction(self, all_predicted_trajectory_list, planning_horizon = 50):
