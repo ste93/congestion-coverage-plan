@@ -1,0 +1,611 @@
+edge_limits:
+  edge1:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge10:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge11:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge12:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge13:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge14:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge15:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge16:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge17:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge18:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge19:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge2:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge20:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge3:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge4:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge5:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge6:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge7:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge8:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+  edge9:
+    five:
+    - 9
+    - 12
+    four:
+    - 7
+    - 9
+    one:
+    - 1
+    - 3
+    six:
+    - 12
+    - 9999999
+    three:
+    - 5
+    - 7
+    two:
+    - 3
+    - 5
+    zero:
+    - 0
+    - 1
+edge_traverse_times:
+  edge1:
+    five: 37.361
+    four: 37.361
+    one: 17.492
+    six: 37.361
+    three: 37.361
+    two: 37.361
+    zero: 7.361
+  edge10:
+    five: 23.57
+    four: 23.57
+    one: 23.57
+    six: 23.57
+    three: 23.57
+    two: 23.57
+    zero: 13.109
+  edge11:
+    five: 122.29
+    four: 92.29
+    one: 24.163
+    six: 122.29
+    three: 72.29
+    two: 44.79
+    zero: 12.29
+  edge12:
+    five: 26.347
+    four: 26.347
+    one: 26.347
+    six: 26.347
+    three: 26.347
+    two: 26.347
+    zero: 15.906
+  edge13:
+    five: 5.58
+    four: 5.58
+    one: 5.58
+    six: 5.58
+    three: 5.58
+    two: 5.58
+    zero: 5.58
+  edge14:
+    five: 15.727
+    four: 15.727
+    one: 15.727
+    six: 15.727
+    three: 15.727
+    two: 15.727
+    zero: 5.727
+  edge15:
+    five: 18.664
+    four: 18.664
+    one: 18.664
+    six: 18.664
+    three: 18.664
+    two: 18.664
+    zero: 8.331
+  edge16:
+    five: 35.63
+    four: 35.63
+    one: 16.125
+    six: 35.63
+    three: 35.63
+    two: 35.63
+    zero: 5.63
+  edge17:
+    five: 66.73
+    four: 66.73
+    one: 23.026
+    six: 66.73
+    three: 66.73
+    two: 44.23
+    zero: 11.73
+  edge18:
+    five: 38.81
+    four: 38.81
+    one: 19.652
+    six: 38.81
+    three: 38.81
+    two: 38.81
+    zero: 8.81
+  edge19:
+    five: 13.173
+    four: 13.173
+    one: 13.173
+    six: 13.173
+    three: 13.173
+    two: 13.173
+    zero: 2.706
+  edge2:
+    five: 17.952
+    four: 17.952
+    one: 17.952
+    six: 17.952
+    three: 17.952
+    two: 17.952
+    zero: 7.498
+  edge20:
+    five: 14.819
+    four: 14.819
+    one: 14.819
+    six: 14.819
+    three: 14.819
+    two: 14.819
+    zero: 4.374
+  edge3:
+    five: 37.849
+    four: 37.849
+    one: 18.803
+    six: 37.849
+    three: 37.849
+    two: 37.849
+    zero: 7.849
+  edge4:
+    five: 17.899
+    four: 17.899
+    one: 17.899
+    six: 17.899
+    three: 17.899
+    two: 17.899
+    zero: 7.007
+  edge5:
+    five: 14.171
+    four: 14.171
+    one: 14.171
+    six: 14.171
+    three: 14.171
+    two: 14.171
+    zero: 4.171
+  edge6:
+    five: 15.611
+    four: 15.611
+    one: 15.611
+    six: 15.611
+    three: 15.611
+    two: 15.611
+    zero: 5.611
+  edge7:
+    five: 19.253
+    four: 19.253
+    one: 19.253
+    six: 19.253
+    three: 19.253
+    two: 19.253
+    zero: 9.06
+  edge8:
+    five: 14.904
+    four: 14.904
+    one: 14.904
+    six: 14.904
+    three: 14.904
+    two: 14.904
+    zero: 4.904
+  edge9:
+    five: 19.84
+    four: 19.84
+    one: 19.84
+    six: 19.84
+    three: 19.84
+    two: 19.84
+    zero: 9.059
+name: madama3_doors_16_experiments
+occupancy_levels:
+- zero
+- one
+- two
+- three
+- four
+- five
+- six
