@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 ENV  DOCKER_BUILDKIT=1
-ARG BRANCH=master
+ARG BRANCH=experiments
 
 
 # Install dependencies

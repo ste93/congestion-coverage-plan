@@ -119,7 +119,7 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None, time_
     # print(data)
     initial_time = datetime.datetime.now()
     # Create the routing index manager.
-    print("data", data)
+    # print("data", data)
     manager = pywrapcp.RoutingIndexManager(
         len(data["distance_matrix"]), data["num_vehicles"], data["depot"]
     )
@@ -173,8 +173,12 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None, time_
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
     search_parameters.log_search = False
-
     search_parameters.time_limit.seconds = time_bound
+    search_parameters.use_full_propagation = True
+    # set the parameter to return once found the best solution
+    search_parameters.solution_limit = 1
+    search_parameters.use_cp_sat = True
+    
 
     solution = routing.SolveWithParameters(search_parameters)
 
@@ -581,7 +585,7 @@ def create_matrix_from_vertices_list_from_shortest_path_matrix_tsp(vertices_ids,
     return matrix
 
 
-def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=INFINITE_DISTANCE, length_function=None):
+def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=INFINITE_DISTANCE, length_function=None, time_for_occupancies=None):
     matrix = []
     initial_vertex_index = vertices_ids.index(initial_vertex_id) + 1
     print("vertices_ids", vertices_ids)
@@ -615,7 +619,7 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
                 else:
                     # print("finding edge from", vertex_row_id, vertex_column_id)
                     if length_function is not None:
-                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_current_occupancies(0))
+                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_occupancies_by_time(time_for_occupancies))
                         row.append(math.floor(edge_length * 100))
                     else:
                         edge_length = occupancy_map.find_edge_from_position(vertex_row_id, vertex_column_id)
@@ -627,12 +631,3 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
     return matrix
 
 
-
-def test_create_matrix_from_vertices_list(occupancy_map, initial_vertex_id):
-
-    vertices_ids = list(occupancy_map.get_vertices().keys()).sort()
-    vertices_ids.sort()
-    matrix = create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id)
-    for row in matrix:
-        print(row)
-    

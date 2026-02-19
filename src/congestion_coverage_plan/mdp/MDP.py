@@ -214,8 +214,8 @@ class MDP:
     def get_possible_actions(self, state):
         # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ) - state.get_visited_vertices()) + ["wait"]
         actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ))
-        if state.get_last_action() is not None and state.get_last_action() != "wait":
-            actions.append("wait")
+        # if state.get_last_action() is not None and state.get_last_action() != "wait":
+        actions.append("wait")
         # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy()))
         return actions
 
