@@ -4,7 +4,21 @@ from congestion_coverage_plan.map_utils.OccupancyMap import OccupancyMap
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 import math
+import datetime
 import numpy as np
+
+INFINITE_DISTANCE = 9999999999999999
+
+
+def apply_infeasible_arcs(routing, manager, distance_matrix, blocked_value=INFINITE_DISTANCE):
+    size = len(distance_matrix)
+    for from_node in range(size):
+        from_index = manager.NodeToIndex(from_node)
+        for to_node in range(size):
+            if from_node == to_node:
+                continue
+            if distance_matrix[from_node][to_node] >= blocked_value:
+                routing.NextVar(from_index).RemoveValue(manager.NodeToIndex(to_node))
 
 def hamilton(graph, start_v):
   size = len(graph)
@@ -87,13 +101,25 @@ def get_solution(manager, routing, solution):
     return route[1:]
 
 
-def solve_with_google_with_data_returning_policy(data, vertex_list = None):
+def get_policy_from_solution(manager, routing, solution, vertex_list):
+    """Returns the solution as a list of routes."""
+    index = routing.Start(0)
+    policy = []
+    while not routing.IsEnd(index):
+        if index != routing.Start(0):
+            policy.append(vertex_list[manager.IndexToNode(index) - 1])
+        index = solution.Value(routing.NextVar(index))
+    return policy
+
+def solve_with_google_with_data_returning_policy(data, vertex_list = None, time_bound = 1):
     """Entry point of the program."""
+    print("Solving with Google OR-Tools...")
     # Instantiate the data problem.
     # data = create_data_model(occupancy_map, time, initial_vertex_id, distance_matrix_function)
     # print(data)
-
+    initial_time = datetime.datetime.now()
     # Create the routing index manager.
+    # print("data", data)
     manager = pywrapcp.RoutingIndexManager(
         len(data["distance_matrix"]), data["num_vehicles"], data["depot"]
     )
@@ -120,6 +146,7 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None):
 
     # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+    apply_infeasible_arcs(routing, manager, data["distance_matrix"], INFINITE_DISTANCE)
 
     # search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     # search_parameters.time_limit.seconds = 10
@@ -146,8 +173,12 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None):
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
     search_parameters.log_search = False
-
-    search_parameters.time_limit.seconds = 1
+    search_parameters.time_limit.seconds = time_bound
+    search_parameters.use_full_propagation = True
+    # set the parameter to return once found the best solution
+    search_parameters.solution_limit = 1
+    search_parameters.use_cp_sat = True
+    
 
     solution = routing.SolveWithParameters(search_parameters)
 
@@ -168,8 +199,19 @@ def solve_with_google_with_data_returning_policy(data, vertex_list = None):
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(previous_index, index, 0)
-        return vertex_list[get_solution(manager, routing, solution)[1][6:]] 
-        return get_solution(manager, routing, solution)
+        print("Solver status: ", routing.status())
+        final_time = datetime.datetime.now()
+        print("Computation time: ", (final_time - initial_time).total_seconds())
+        solution_list = get_solution(manager, routing, solution)
+        print("Solution found: ", solution_list)
+        print("vertices list: ", vertex_list)
+        print("routing_distance" , route_distance)
+        print_solution(manager, routing, solution)
+        policy = get_policy_from_solution(manager, routing, solution, vertex_list)
+        print("Policy found: ", policy)
+        return policy[1:] if len(policy) > 1 else policy[0] if policy else None
+
+        
     else:
         # print("No solution found")
         return None
@@ -207,6 +249,7 @@ def solve_with_google_with_data(data):
 
     # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+    apply_infeasible_arcs(routing, manager, data["distance_matrix"], INFINITE_DISTANCE)
 
     # search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     # search_parameters.time_limit.seconds = 10
@@ -255,6 +298,7 @@ def solve_with_google_with_data(data):
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(previous_index, index, 0)
+        print("Solver status: ", routing.status())
         return route_distance / 100.0
     else:
         # print("No solution found")
@@ -293,6 +337,7 @@ def solve_with_google(occupancy_map, time, initial_vertex_id, distance_matrix_fu
 
     # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+    apply_infeasible_arcs(routing, manager, data["distance_matrix"], INFINITE_DISTANCE)
 
     # search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     # search_parameters.time_limit.seconds = 10
@@ -329,6 +374,7 @@ def solve_with_google(occupancy_map, time, initial_vertex_id, distance_matrix_fu
     # Print solution on console.
     if solution:
         
+        print("Solver status: ", routing.status())
         print_solution(manager, routing, solution)
         # print(routing)
         # print(manager)
@@ -344,7 +390,7 @@ def get_current_occupancies(occupancy_map, idVertex1, idVertex2, occupancies):
     if edge is None:
         edge = occupancy_map.find_edge_from_position(idVertex2, idVertex1)
     if edge is None:
-        return 9999999999999999
+        return INFINITE_DISTANCE
     else:
         edge_id = edge.get_id()
         # here should be a function
@@ -362,7 +408,7 @@ def get_length(occupancy_map, idVertex1, idVertex2, occupancies):
     if edge is None:
         edge = occupancy_map.find_edge_from_position(idVertex2, idVertex1)
     if edge is None:
-        return 9999999999999999
+        return INFINITE_DISTANCE
     return math.floor(edge.get_length() * 100)
 
 def get_medium_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
@@ -370,7 +416,7 @@ def get_medium_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     if edge is None:
         edge = occupancy_map.find_edge_from_position(idVertex2, idVertex1)
     if edge is None:
-        return 9999999999999999
+        return INFINITE_DISTANCE
     else:
         edge_id = edge.get_id()
         # here should be a function
@@ -387,7 +433,7 @@ def get_high_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     if edge is None:
         edge = occupancy_map.find_edge_from_position(idVertex2, idVertex1)
     if edge is None:
-        return 9999999999999999
+        return INFINITE_DISTANCE
     else:
         edge_id = edge.get_id()
         # here should be a function
@@ -426,10 +472,10 @@ def create_matrix_from_occupancy_map_generic(occupancy_map, time, initial_vertex
                 if column_id == 1:
                     row.append(0)
                 elif column_id != 1:
-                    row.append(9999999999999999)
+                    row.append(INFINITE_DISTANCE)
             elif column_id == 0:
                 if row_id == 1:
-                    row.append(9999999999999999)
+                    row.append(INFINITE_DISTANCE)
                 elif row_id != 1:
                     row.append(0)
             else:
@@ -438,7 +484,7 @@ def create_matrix_from_occupancy_map_generic(occupancy_map, time, initial_vertex
     return matrix
 
 
-def create_matrix_from_vertices_list_for_mst(vertices_ids, occupancy_map, initial_vertex_id, shortest_path_matrix=None, value_for_not_existent_edge=9999999999999999):
+def create_matrix_from_vertices_list_for_mst(vertices_ids, occupancy_map, initial_vertex_id, shortest_path_matrix=None, value_for_not_existent_edge=INFINITE_DISTANCE):
     matrix = []
     for row_id in range(0, len(vertices_ids)):
         row = []
@@ -466,7 +512,7 @@ def create_matrix_from_vertices_list_for_mst(vertices_ids, occupancy_map, initia
     return matrix
 
 
-def convert_mst_matrix_to_full_tsp_matrix(vertices_ids, mst_matrix, initial_vertex_index, value_for_not_existent_edge=9999999999999999):
+def convert_mst_matrix_to_full_tsp_matrix(vertices_ids, mst_matrix, initial_vertex_index, value_for_not_existent_edge=INFINITE_DISTANCE):
     matrix = []
 
     for row_id in range(0, len(mst_matrix) + 1):
@@ -494,7 +540,7 @@ def create_matrix_from_vertices_list_from_shortest_path_matrix_tsp(vertices_ids,
                                                                occupancy_map, 
                                                                initial_vertex_id, 
                                                                shortest_path_matrix, 
-                                                               value_for_not_existent_edge=9999999999999999, 
+                                                               value_for_not_existent_edge=INFINITE_DISTANCE, 
                                                                insert_additional_nodes=False):
     matrix = []
     initial_vertex_index = vertices_ids.index(initial_vertex_id)
@@ -539,10 +585,12 @@ def create_matrix_from_vertices_list_from_shortest_path_matrix_tsp(vertices_ids,
     return matrix
 
 
-def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=9999999999999999, length_function=None):
+def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=INFINITE_DISTANCE, length_function=None, time_for_occupancies=None):
     matrix = []
     initial_vertex_index = vertices_ids.index(initial_vertex_id) + 1
-
+    print("vertices_ids", vertices_ids)
+    print("initial_vertex_index", initial_vertex_index)
+    print("initial_vertex_id", initial_vertex_id)
     for row_id in range(0, len(vertices_ids) + 1):
         row = []
         vertex_row_id = ""
@@ -571,7 +619,7 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
                 else:
                     # print("finding edge from", vertex_row_id, vertex_column_id)
                     if length_function is not None:
-                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_current_occupancies(0))
+                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_occupancies_by_time(time_for_occupancies))
                         row.append(math.floor(edge_length * 100))
                     else:
                         edge_length = occupancy_map.find_edge_from_position(vertex_row_id, vertex_column_id)
@@ -581,3 +629,5 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
                             row.append(math.floor(edge_length.get_length() * 100))
         matrix.append(row)
     return matrix
+
+

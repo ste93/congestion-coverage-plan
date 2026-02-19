@@ -11,7 +11,7 @@ def get_time(row):
     # row = float(row)
 
     # return eval(row)
-labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm"]
+labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm", "steps_tsp_current_occupancy_with_replanning"]
 levels = [2,5,8]
 
 
@@ -20,12 +20,12 @@ def get_collisions(row):
     # row = list(row)
     # convert the string to a list of tuples
     row = eval(row)
-    print(row)
+    # print(row)
     for x in row:
-        print(x[1])
+        # print(x[1])
         # print(type(x))
         collisions_local = collisions_local + int(x[1])
-    print("collisions", collisions_local)
+    # print("collisions", collisions_local)
     return collisions_local
         
 
@@ -115,17 +115,20 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     times = []
     execution_time = {}
     cpu_time = {}
+    cpu_time_first_planning = {}
     collisions = {}
     # labels = ["steps_avg", "steps_min", "steps_max", "steps_curr", "steps_lrtdp", "steps_lrtdp_pwm"]
     num_rows = len(labels)
-    num_tsp_rows = 4
+    num_tsp_rows = 1
     for label in labels:
         execution_time[label] = {}
         cpu_time[label] = {}
         collisions[label] = {}
+        cpu_time_first_planning[label] = {}
         for i in levels:
             execution_time[label][str(i)] = []
             cpu_time[label][str(i)] = []
+            cpu_time_first_planning[label][str(i)] = []
             collisions[label][str(i)] = []
             planning_time_lrtdp_per_step_per_level[str(i)] = {}
             planning_time_lrtdp_pwm_per_step_per_level[str(i)] = {}
@@ -144,7 +147,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         if csv_file_lrtdp_pwm is not None and ("FAILURE" in data_lrtdp_pwm[row_id][3]):
             print("Skipping row", row_id, "due to FAILURE in lrtdp pwm")
             continue
-        print("Processing row", row_id, "of", len(data_lrtdp))
+        # print("Processing row", row_id, "of", len(data_lrtdp))
         ## PROCESS LRTDP RESULTS
         time_lrtdp = get_time(data_lrtdp[row_id][2])
         times_lrtdp = data_lrtdp[row_id][-2]
@@ -155,7 +158,10 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
                 if str(i) not in planning_time_lrtdp_per_step_per_level[str(data_lrtdp[row_id][-1])]:
                     planning_time_lrtdp_per_step_per_level[str(data_lrtdp[row_id][-1])][str(i)] = []
                 planning_time_lrtdp_per_step_per_level[str(data_lrtdp[row_id][-1])][str(i)].append(float(times_lrtdp[i]))
+        
         cpu_time["steps_lrtdp"][str(data_lrtdp[row_id][-1])].append(float(datetime.strptime(data_lrtdp[row_id][4], "%H:%M:%S.%f").microsecond / 1000000 + datetime.strptime(data_lrtdp[row_id][4], "%H:%M:%S.%f").second + datetime.strptime(data_lrtdp[row_id][4], "%H:%M:%S.%f").minute * 60 + datetime.strptime(data_lrtdp[row_id][4], "%H:%M:%S.%f").hour * 3600))
+
+        cpu_time_first_planning["steps_lrtdp"][str(data_lrtdp[row_id][-1])].append(float(times_lrtdp[0]))
         times_steps_local = eval(data_lrtdp[row_id][-3])
         times_cpu_local = eval(data_lrtdp[row_id][-2])
         # execution_time_local = times_cpu_local[0]
@@ -166,12 +172,12 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
             execution_time_local += times_steps_local[j] 
         execution_time["steps_lrtdp"][str(data_lrtdp[row_id][-1])].append(execution_time_local)
         collisions_local = get_collisions(data_lrtdp[row_id][3])
-        print("collisions local", collisions_local)
+        # print("collisions local", collisions_local)
         collisions["steps_lrtdp"][str(data_lrtdp[row_id][-1])].append(collisions_local)
 
 
         if csv_file_lrtdp_pwm is not None:
-            print("Processing row", row_id, "of", len(data_lrtdp_pwm), "for lrtdp pwm")
+            # print("Processing row", row_id, "of", len(data_lrtdp_pwm), "for lrtdp pwm")
             time_lrtdp_pwm = get_time(data_lrtdp_pwm[row_id][2])
             times_lrtdp_pwm = data_lrtdp_pwm[row_id][-2]
             times_lrtdp_pwm = eval(times_lrtdp_pwm)
@@ -197,16 +203,20 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
 
 
 
-        print(data_lrtdp[row_id])
+        # print(data_lrtdp[row_id])
         min_time = 99999999
         min_collisions_tsp = 9999999
-        print("Processing tsp rows", row_id * 4, "to", row_id + num_tsp_rows - 1)
-        for tsp_row_id in range(row_id * 4, row_id * 4 + num_tsp_rows):
+        # print("Processing tsp rows", row_id * 4, "to", row_id + num_tsp_rows - 1)
+        for tsp_row_id in range(row_id, row_id + num_tsp_rows):
+            if "FAILURE" in data_tsp[tsp_row_id][3]:
+                print("Skipping tsp row", tsp_row_id, "due to FAILURE in tsp")
+                continue
             if get_time(data_tsp[tsp_row_id][2]) < min_time:
                 min_time = get_time(data_tsp[tsp_row_id][2])
 
             execution_time[data_tsp[tsp_row_id][1]][str(data_tsp[tsp_row_id][-1])].append(float(data_tsp[tsp_row_id][2]))
             cpu_time[data_tsp[tsp_row_id][1]][str(data_tsp[tsp_row_id][-1])].append(float(datetime.strptime(data_tsp[tsp_row_id][4], "%H:%M:%S.%f").microsecond / 1000000 + datetime.strptime(data_tsp[tsp_row_id][4], "%H:%M:%S.%f").second + datetime.strptime(data_tsp[tsp_row_id][4], "%H:%M:%S.%f").minute * 60 + datetime.strptime(data_tsp[tsp_row_id][4], "%H:%M:%S.%f").hour * 3600))
+            cpu_time_first_planning[data_tsp[tsp_row_id][1]][str(data_tsp[tsp_row_id][-1])].append(float(data_tsp[tsp_row_id][-3]))
             collisions[data_tsp[tsp_row_id][1]][str(data_tsp[tsp_row_id][-1])].append(get_collisions(data_tsp[tsp_row_id][3]))
 
             if collisions[data_tsp[tsp_row_id][1]][str(data_tsp[tsp_row_id][-1])][-1] < min_collisions_tsp:
@@ -238,7 +248,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         elif collisions["steps_lrtdp"][str(data_lrtdp[row_id][-1])][-1] > min_collisions_tsp:
             collisions_better_tsp.append(collisions["steps_lrtdp"][str(data_lrtdp[row_id][-1])][-1])
 
-    print (collisions["steps_lrtdp"])
+    # print (collisions["steps_lrtdp"])
     print ("---- DONE READING CSV FILE ----")
     # print("execution time", execution_time)
     for j in levels:
@@ -288,6 +298,8 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         print("Average number of collisions for tsp max level", i, np.mean(collisions["steps_max"][str(i)]))
         print("Average number of collisions for tsp curr level", i, np.mean(collisions["steps_curr"][str(i)]))
         print("Average number of collisions for lrtdp level", i, np.mean(collisions["steps_lrtdp"][str(i)]))
+        print("Average number of collisions for tsp current occupancy with replanning level", i, np.mean(collisions["steps_tsp_current_occupancy_with_replanning"][str(i)]))
+        print("p-value for execution time lrtdp vs tsp current occupancy with replanning level", i, mannwhitneyu( execution_time["steps_lrtdp"][str(i)], execution_time["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')[1])
 
     print("---- DONE CALCULATING STATISTICS ----")
     print("Number of times lrtdp was faster than tsp:", lrtdp_count)
@@ -301,61 +313,72 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     # print("Maximum time delta for tsp:", time_delta_max_tsp)   
     # print("Average time delta for lrtdp:", np.mean(time_delta_better_lrtdp))
     # print("Average time delta for tsp:", np.mean(time_delta_better_tsp))
-
-    for i in levels:
-        fig = plt.figure(figsize =(10, 7))
-        ax = fig.add_subplot(111)
-        ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time per step (level " + str(i) + ")")
-        # set y-axis scale to be multiple of 3
-        max_y = np.max([np.max(planning_time_lrtdp_per_step_per_level[str(i)][str(x)]) for x in planning_time_lrtdp_per_step_per_level[str(i)].keys()])
-        plt.yticks(np.arange(0, max_y + 2, step=20))
-        max_steps = len(planning_time_lrtdp_per_step_per_level[str(i)].keys())
-        data = [planning_time_lrtdp_per_step_per_level[str(i)][str(x)] for x in range(0, max_steps)]
-        ax.boxplot(data, tick_labels = [str(x) for x in range(1, max_steps+1)])
-        plt.ylabel("Planning time per step (s)")
-        plt.xlabel("Step")
-        plt.grid()
-        plt.show()
+    plot_planning_time__per_levels = False
+    plot_execution_time_per_levels = False
+    plot_planning_time_per_levels = True
+    plot_collisions_per_levels = False
+    if plot_planning_time__per_levels:
+        for i in levels:
+            fig = plt.figure(figsize =(10, 7))
+            ax = fig.add_subplot(111)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time per step (level " + str(i) + ")")
+            # set y-axis scale to be multiple of 3
+            max_y = np.max([np.max(planning_time_lrtdp_per_step_per_level[str(i)][str(x)]) for x in planning_time_lrtdp_per_step_per_level[str(i)].keys()])
+            plt.yticks(np.arange(0, max_y + 2, step=20))
+            max_steps = len(planning_time_lrtdp_per_step_per_level[str(i)].keys())
+            data = [planning_time_lrtdp_per_step_per_level[str(i)][str(x)] for x in range(0, max_steps)]
+            ax.boxplot(data, tick_labels = [str(x) for x in range(1, max_steps+1)])
+            plt.ylabel("Planning time per step (s)")
+            plt.xlabel("Step")
+            plt.grid()
+            plt.show()
 
     # plot the execution time for the lrtdp and tsp algorithms for each level
-    for i in levels:
-        fig = plt.figure(figsize =(10, 7))
-        ax = fig.add_subplot(111)
-        ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time (level " + str(i) + ") (first planning + max(planning, execution))")
-        data = [execution_time[label][str(i)] for label in labels]
-        # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
-        ax.boxplot(data, tick_labels = labels)
-        plt.ylabel("Execution time (s)")
-        plt.xlabel("Algorithms")
-        plt.grid()
-        plt.show()
+    if plot_execution_time_per_levels:
+        for i in levels:
+            fig = plt.figure(figsize =(10, 7))
+            ax = fig.add_subplot(111)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time (level " + str(i) + ") (first planning + max(planning, execution))")
+            # set only first planning time 
+            # data = [execution_time[label][str(i)] for label in labels if label != "steps_lrtdp_pwm"]
+            data = [execution_time[label][str(i)] for label in labels]
+            # print("data for level", i, data)
+            # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
+            ax.boxplot(data, tick_labels = labels)
+            plt.ylabel("Execution time (s)")
+            plt.xlabel("Algorithms")
+            plt.grid()
+            plt.show()
 
 
     # plot the planning time for the execution of the lrtdp and tsp algorithms for each level
-    for i in levels:
-        fig = plt.figure(figsize =(10, 7))
-        ax = fig.add_subplot(111)
-        ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (level " + str(i) + ")")
-        data = [cpu_time[label][str(i)] for label in labels]
-        # data = [cpu_time["steps_avg"][str(i)], cpu_time["steps_min"][str(i)], cpu_time["steps_max"][str(i)], cpu_time["steps_curr"][str(i)], cpu_time["steps_lrtdp"][str(i)]]
-        # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
-        ax.boxplot(data, tick_labels = labels)
-        plt.ylabel("Planning time (s)")
-        plt.xlabel("Algorithms")
-        plt.grid()
-        plt.show()
+    if plot_planning_time_per_levels:
+        for i in levels:
+            fig = plt.figure(figsize =(10, 7))
+            ax = fig.add_subplot(111)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (level " + str(i) + ")")
+            data = [cpu_time[label][str(i)] for label in labels]
+            print("planning time data for level", i, data)
+            # data = [cpu_time["steps_avg"][str(i)], cpu_time["steps_min"][str(i)], cpu_time["steps_max"][str(i)], cpu_time["steps_curr"][str(i)], cpu_time["steps_lrtdp"][str(i)]]
+            # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
+            ax.boxplot(data, tick_labels = labels)
+            plt.ylabel("Planning time (s)")
+            plt.xlabel("Algorithms")
+            plt.grid()
+            plt.show()
 
     # plot the number of collisions for the execution of the lrtdp and tsp algorithms for each level
-    for i in levels:
-        fig = plt.figure(figsize =(10, 7))
-        ax = fig.add_subplot(111)
-        ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " number of collisions (level " + str(i) + ")")
-        data = [collisions[label][str(i)] for label in labels]
-        ax.boxplot(data, tick_labels = labels)
-        plt.ylabel("Number of collisions")
-        plt.xlabel("Algorithms")
-        plt.grid()
-        plt.show()
+    if plot_collisions_per_levels:
+        for i in levels:
+            fig = plt.figure(figsize =(10, 7))
+            ax = fig.add_subplot(111)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " number of collisions (level " + str(i) + ")")
+            data = [collisions[label][str(i)] for label in labels]
+            ax.boxplot(data, tick_labels = labels)
+            plt.ylabel("Number of collisions")
+            plt.xlabel("Algorithms")
+            plt.grid()
+            plt.show()
 
 
 
@@ -397,27 +420,63 @@ def plot_cpu_times_per_number_of_vertices(csv_file_tsp):
 
     print("---- DONE PLOTTING ----")
 
+def print_usage():
+    print("Usage: python calculate_statistics.py statistics <csv_file_tsp> <csv_file_lrtdp> <max_levels> [--lrtdp_pwm_file <csv_file_lrtdp_pwm>]")
+    print("or: python calculate_statistics.py times <csv_file_tsp>")
+
+
+
 if __name__ == '__main__':
     # get_statistics("steps_iit_time_iter.csv")
     # get_statistics("steps_small_occupancy_map_atc_corridor_mixed.csv")
     # get_statistics("steps_medium_occupancy_map_atc_corridor_mixed.csv")
     if len(sys.argv) < 2:
-        print("Usage: python calculate_statistics.py statistics <csv_file_tsp> <max_levels>")
-        print("or: python calculate_statistics.py times <csv_file_tsp>")
+        print_usage()
         sys.exit(1)
     if sys.argv[1] == "statistics":
-        if len(sys.argv) < 5:
-            print("Usage: python calculate_statistics.py statistics <csv_file_tsp> <max_levels>")
-            sys.exit(1)
-        if len(sys.argv) < 6:
-            print("No lrtdp pwm file provided")
-            print("tsp file:", sys.argv[2])
-            print("lrtdp file:", sys.argv[3])
-            print("lrtdp pwm file:", sys.argv[4])
-
-            get_statistics(sys.argv[2], sys.argv[3], int(sys.argv[4]))
+        if "--lrtdp_file" in sys.argv:
+            lrtdp_file_index = sys.argv.index("--lrtdp_file")
+            if lrtdp_file_index + 1 >= len(sys.argv):
+                print("Error: --lrtdp_file requires a value")
+                sys.exit(1)
+            lrtdp_file = sys.argv[lrtdp_file_index + 1]
         else:
-            get_statistics(sys.argv[2], sys.argv[3],  int(sys.argv[5]), sys.argv[4])
+            sys.exit("Error: --lrtdp_file argument is required for statistics command")
+            sys.exit(1)
+
+        if "--lrtdp_pwm_file" in sys.argv:
+            lrtdp_pwm_file_index = sys.argv.index("--lrtdp_pwm_file")
+            if lrtdp_pwm_file_index + 1 >= len(sys.argv):
+                print("Error: --lrtdp_pwm_file requires a value")
+                sys.exit(1)
+            lrtdp_pwm_file = sys.argv[lrtdp_pwm_file_index + 1]
+        else:
+            lrtdp_pwm_file = None
+
+        if "--tsp_file" in sys.argv:
+            tsp_file_index = sys.argv.index("--tsp_file")
+            if tsp_file_index + 1 >= len(sys.argv):
+                print("Error: --tsp_file requires a value")
+                sys.exit(1)
+            tsp_file = sys.argv[tsp_file_index + 1]
+        else:
+            sys.exit("Error: --tsp_file argument is required for statistics command")
+            sys.exit(1)
+
+        if "--max_levels" in sys.argv:
+            max_levels_index = sys.argv.index("--max_levels")
+            if max_levels_index + 1 >= len(sys.argv):
+                print("Error: --max_levels requires a value")
+                sys.exit(1)
+            max_levels = int(sys.argv[max_levels_index + 1])
+        else:
+            print_usage()
+            sys.exit(1)
+        print("tsp_file", tsp_file)
+        print("lrtdp_file", lrtdp_file)
+        print("max_levels", max_levels)
+        print("lrtdp_pwm_file", lrtdp_pwm_file)
+        get_statistics(csv_file_tsp=tsp_file, csv_file_lrtdp=lrtdp_file, max_levels=max_levels, csv_file_lrtdp_pwm=lrtdp_pwm_file)
     elif sys.argv[1] == "times":
         plot_cpu_times_per_number_of_vertices(sys.argv[2])
     else:

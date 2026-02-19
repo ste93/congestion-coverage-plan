@@ -3,10 +3,12 @@ import math
 import congestion_coverage_plan.utils.Logger as Logger 
 
 class State:
-    def __init__(self, vertex, time, visited_vertices):
+    def __init__(self, vertex, time, visited_vertices, explained_vertices, last_action=None):
         self._vertex = vertex
         self._time = time
         self._visited_vertices = visited_vertices
+        self._explained_vertices = explained_vertices
+        self._last_action = last_action
         self._id = self._calculate_id()
 
     def __eq__(self, other):
@@ -39,6 +41,12 @@ class State:
     
     def get_visited_vertices(self):
         return self._visited_vertices
+    
+    def set_last_action(self, action):
+        self._last_action = action
+
+    def get_last_action(self):
+        return self._last_action
 
 
 class Transition:
@@ -199,13 +207,15 @@ class MDP:
                 pairs.append((edge, occupancy_level))
 
             for item in pairs:
-                self.compute_transition(State(state.get_vertex(), state.get_time(), state.get_visited_vertices()), item[0], item[1], transitions)
+                self.compute_transition(State(state.get_vertex(), state.get_time(), state.get_visited_vertices(), state.get_last_action()), item[0], item[1], transitions)
             return transitions
 
 
     def get_possible_actions(self, state):
         # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ) - state.get_visited_vertices()) + ["wait"]
-        actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy()  + ["wait"]))
+        actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ))
+        # if state.get_last_action() is not None and state.get_last_action() != "wait":
+        actions.append("wait")
         # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy()))
         return actions
 
@@ -214,7 +224,7 @@ class MDP:
         #returns a single next state
         visited_vertices = state.get_visited_vertices() | set([transition.get_end()])
 
-        return State(transition.get_end(), state.get_time() + transition.get_cost(), visited_vertices)
+        return State(transition.get_end(), state.get_time() + transition.get_cost(), visited_vertices, transition.get_action())
 
 
 

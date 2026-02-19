@@ -356,13 +356,18 @@ class OccupancyMap(TopologicalMap):
 
     def load_occupancy_map(self, filename):
         print(filename)
-        self.load_topological_map(filename.split('.')[0] + "-topological.yaml")
-        with open(filename, 'r') as f:
-            data = yaml.load(f, Loader=yaml.FullLoader)
-            self.name = data['name']
-            self.occupancy_levels = data['occupancy_levels']
-            self.edge_limits = data['edge_limits']
-            self.edge_traverse_times = data['edge_traverse_times']
+        # try catch for loading the topological map and if it fails, print an error message and return false
+        try:
+            self.load_topological_map(filename.split('.')[0] + "-topological.yaml")
+            with open(filename, 'r') as f:
+                data = yaml.load(f, Loader=yaml.FullLoader)
+                self.name = data['name']
+                self.occupancy_levels = data['occupancy_levels']
+                self.edge_limits = data['edge_limits']
+                self.edge_traverse_times = data['edge_traverse_times']
+        except Exception as e:
+            print("Error loading occupancy map:", e)
+            return False
 
 
 
@@ -429,6 +434,19 @@ class OccupancyMap(TopologicalMap):
 
 
 
+    def get_occupancies_by_time(self, time):
+        human_traj_data_by_time = self.human_traj_data.loc[abs(self.human_traj_data['time'] - time) < 1 ]
+        current_occupancies = {}   
+        for index, row in human_traj_data_by_time.iterrows():
+
+            for edge_id in self.edges.keys():
+                edge = self.edges[edge_id]
+                if edge.is_inside_area(row['x'], row['y']):
+                    if edge.get_id() not in current_occupancies:
+                        current_occupancies[edge.get_id()] = 0
+                    current_occupancies[edge.get_id()] += 1
+
+        return current_occupancies
 
     def get_current_occupancies(self, time):
         return self.current_occupancies
