@@ -1,0 +1,95 @@
+num_points_per_person: 7
+persons:
+  person1:
+    id: 1
+    start_x: 3.74
+    start_y: 0.7
+    vx: 0.5
+    vy: 0
+  
+  person2:
+    id: 2
+    start_x: 4.74
+    start_y: 0.7
+    vx: 0.5
+    vy: 0
+  
+  person3:
+    id: 3
+    start_x: 2.74
+    start_y: 0.7
+    vx: 0.5
+    vy: 0
+  
+  person4:
+    id: 4
+    start_x: 5.74
+    start_y: 0.7
+    vx: 0.5
+    vy: 0
+  
+  person5:
+    id: 5
+    start_x: 19.10
+    start_y: 1.5
+    vx: 0
+    vy: -0.5
+  
+  person6:
+    id: 6
+    start_x: 19.10
+    start_y: 2.5
+    vx: 0
+    vy: -0.5
+  
+  person7:
+    id: 7
+    start_x: 19.10
+    start_y: 3.5
+    vx: 0
+    vy: -0.5
+  
+  person8:
+    id: 8
+    start_x: 16.01
+    start_y: -11.81
+    vx: 0
+    vy: -0.5
+  
+  person9:
+    id: 9
+    start_x: 16.01
+    start_y: -9.81
+    vx: 0
+    vy: -0.5
+  
+  person10:
+    id: 10
+    start_x: 16.01
+    start_y: -10.81
+    vx: 0
+    vy: -0.5
+  
+  person11:
+    id: 11
+    start_x: 16.01
+    start_y: -25.0
+    vx: 0
+    vy: 0.5
+  
+  person12:
+    id: 12
+    start_x: 16.01
+    start_y: -24.0
+    vx: 0
+    vy: 0.5
+  
+  person13:
+    id: 13
+    start_x: 16.01
+    start_y: -23.0
+    vx: 0
+    vy: 0.5
+  
+  
+  

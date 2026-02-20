@@ -1,11 +1,15 @@
 from congestion_coverage_plan.mdp.MDP import MDP, State
 import datetime
 from scipy.sparse import csr_array
+from scipy.sparse.csgraph import shortest_path
+from congestion_coverage_plan.utils import Logger
 from scipy.sparse.csgraph import shortest_path, minimum_spanning_tree
 import numpy as np
 from congestion_coverage_plan.utils import Logger
 from congestion_coverage_plan.hamiltonian_path.hamiltonian_path import create_matrix_from_vertices_list_for_mst,  create_matrix_from_vertices_list, solve_with_google_with_data, create_data_model_from_matrix, create_matrix_from_vertices_list_from_shortest_path_matrix_tsp, create_matrix_from_vertices_list_for_mst
 import sys
+
+
 class Heuristics():
 
     def __init__(self, 
@@ -15,7 +19,7 @@ class Heuristics():
                  logger = None):
         self.occupancy_map = occupancy_map
         self._mdp = mdp
-        self.logger = logger if logger is not None else Logger()
+        # self.logger = logger if logger is not None else Logger()
         self.shortest_paths_matrix = self.calculate_shortest_path_matrix()
         self.minimum_edge_entering_vertices_dict = self.minimum_edge_entering_vertices()
         self.heuristic_function = None
@@ -29,6 +33,8 @@ class Heuristics():
             self.heuristic_function = self.heuristic_hamiltonian_path
         elif heuristic_function == "hamiltonian_path_with_shortest_path":
             self.heuristic_function = self.heuristic_hamiltonian_path_with_shortest_path
+        if heuristic_function == "madama_experiments":
+            self.heuristic_function = self.heuristic_experiments
         else:
             print("Heuristic function not recognized")
             sys.exit(1)
@@ -94,9 +100,9 @@ class Heuristics():
 
 
     def calculate_shortest_path(self, vertex1, vertex2):
-        vertex1_number = int(vertex1[6:]) - 1
-        vertex2_number = int(vertex2[6:]) - 1
-        return self.shortest_paths_matrix[vertex1_number][vertex2_number]
+        vertex1_position = sorted(self.occupancy_map.get_vertices().keys()).index(vertex1)
+        vertex2_position = sorted(self.occupancy_map.get_vertices().keys()).index(vertex2)
+        return self.shortest_paths_matrix[vertex1_position][vertex2_position]
 
 
     def calculate_shortest_path_matrix(self):
@@ -106,11 +112,11 @@ class Heuristics():
 
 
     def create_map_matrix(self):
-        vertices = self.occupancy_map.get_vertices()
+        vertices = sorted(self.occupancy_map.get_vertices().keys())
         mst_matrix = []
-        for vertex in vertices.keys():
+        for vertex in vertices:
             mst_matrix_line = []
-            for vertex2 in vertices.keys():
+            for vertex2 in vertices:
                 if vertex == vertex2:
                     mst_matrix_line.append(0)
                 elif self.occupancy_map.find_edge_from_position(vertex, vertex2) is not None:
@@ -194,3 +200,25 @@ class Heuristics():
         self.logger.log_time_elapsed("heuristic_teleport::time for calculating heuristic teleport", (end_time - initial_time).total_seconds())
         return value
 
+
+
+
+    def heuristic_experiments(self, state):
+        if self._mdp.solved(state):
+            return 0
+        goal_vertex = self.occupancy_map.find_vertex_from_id(sorted(self.occupancy_map.get_final_goal_vertices())[0])
+        current_vertex = self.occupancy_map.find_vertex_from_id(state.get_vertex())
+        shortest_path = self.calculate_shortest_path(state.get_vertex(), goal_vertex.get_id())
+        remaining_pois_to_explain = len(self.occupancy_map.get_pois_set()) - len(state.get_pois_explained())
+        # get current vertex poi
+        penalty = 0
+        current_vertex_poi = current_vertex.get_poi_number() 
+        if current_vertex_poi is not None:
+            for poi_number in range(1, current_vertex_poi):
+                if poi_number not in state.get_pois_explained():
+                    penalty = penalty + 99999
+        # increase cost if the pois before are not explained
+        
+        # check if all the states are connected
+        cost = shortest_path + (remaining_pois_to_explain * self._mdp.get_explain_time()) + penalty
+        return cost if cost is not None else 9999999

@@ -9,7 +9,7 @@ import numpy as np
 
 class CliffPredictor:
 
-    def __init__(self, dataset, map_file, mod_file, observed_tracklet_length, start_length, planning_horizon, beta, sample_radius, delta_t, method, fig_size, ground_truth_data_file):
+    def __init__(self, dataset,  mod_file, observed_tracklet_length, start_length, planning_horizon, beta, sample_radius, delta_t, method, fig_size, ground_truth_data_file = None, map_file = None):
         self.map_file = map_file
         self.mod_file = mod_file
         self.ground_truth_data_file = ground_truth_data_file
@@ -48,6 +48,16 @@ class CliffPredictor:
 
         plt.show()
 
+    def display_cliff_map(self):
+        # fig, ax = plt.subplot(111, facecolor='grey')
+        img = plt.imread(self.map_file)
+        plt.imshow(img, cmap='gray', vmin=0, vmax=255, extent=self.fig_size)
+        Plotter.plot_cliff_map(self.cliff_map_data)
+        # Plotter.plot_all_predicted_trajs(all_predicted_trajectory_list, self.observed_tracklet_length)
+        plt.show()
+
+
+
     def display_cliff_map_with_prediction(self, all_predicted_trajectory_list, planning_horizon = 50):
         fig, ax = plt.subplot(111, facecolor='grey')
         img = plt.imread(self.map_file)
@@ -85,8 +95,8 @@ class CliffPredictor:
             # print("person_positions", person_positions)
             # sort the trajectory by time
             # print("traj", traj)
-            traj = sorted(traj, key=lambda x: float(x[0]))
-            human_traj_data_by_person_id = np.array([[pose[0], pose[1], pose[2], pose[3], pose[4]] for pose in traj])
+            traj = sorted(traj, key=lambda x: float(x['timestamp']))
+            human_traj_data_by_person_id = np.array([[pose['timestamp'], pose['x'], pose['y'], pose['velocity'], pose['motion_angle']] for pose in traj])
 
             # human_traj_data_by_person_id = self.get_human_traj_data_by_person_id(human_traj_data, person_id)
 

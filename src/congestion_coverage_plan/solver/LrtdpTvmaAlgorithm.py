@@ -5,8 +5,9 @@ from scipy.sparse.csgraph import shortest_path, minimum_spanning_tree
 import numpy as np
 from congestion_coverage_plan.utils import Logger
 from congestion_coverage_plan.solver.Heuristics import Heuristics
-from congestion_coverage_plan.hamiltonian_path.hamiltonian_path import create_matrix_from_vertices_list_for_mst,  create_matrix_from_vertices_list, solve_with_google_with_data, create_data_model_from_matrix, create_matrix_from_vertices_list_from_shortest_path_matrix_tsp, create_matrix_from_vertices_list_for_mst
 import sys
+from array import *
+
 class LrtdpTvmaAlgorithm():
 
     def __init__(self, 
@@ -19,19 +20,21 @@ class LrtdpTvmaAlgorithm():
                  time_start , 
                  wait_time, 
                  heuristic_function, 
-                 vinitState=None, 
-                 logger=None):
+                 initial_state=None, 
+                 logger=None,
+                 explain_time=20):
         self.occupancy_map = occupancy_map
 
         self.mdp = MDP(occupancy_map=occupancy_map, 
                        time_for_occupancies=time_for_occupancies, 
                        time_start=time_start, 
-                       wait_time=wait_time)
+                       wait_time=wait_time, 
+                       explain_time=explain_time)
         self._wait_time = wait_time
         self.initial_time = time_for_occupancies
         self.time_for_occupancies = time_for_occupancies
-        if vinitState is not None:
-            self.vinitState = vinitState
+        if initial_state is not None:
+            self.vinitState = initial_state
             self.initial_time = time_for_occupancies
         else:
             self.vinitState = State(initial_state_name, 
@@ -58,7 +61,7 @@ class LrtdpTvmaAlgorithm():
 
         self.heuristic_function = heuristics.heuristic_function
         self.heuristic_backup = {}
-        
+        print("congestion-coverage-plan init with version 2026-02-19")
     ### HELPERS
     def get_policy(self):
         return self.policy
@@ -104,12 +107,12 @@ class LrtdpTvmaAlgorithm():
 
     def calculate_argmin_Q(self, state):
         qvalues = []
-        state_internal = State(state.get_vertex(), state.get_time(), state.get_visited_vertices().copy(), state.get_last_action())
+        state_internal = State(state.get_vertex(), state.get_time(), state.get_visited_vertices().copy(), state.get_pois_explained().copy())
         time_initial = datetime.datetime.now()
         possible_actions = self.mdp.get_possible_actions(state_internal)
         if not possible_actions:
-            print("NO POSSIBLE ACTIONS???")
-            return (0, state_internal, "")
+            print("NO POSSIBLE ACTIONS - dead end reached for state:", state_internal.to_string())
+            return (99999999, state_internal, "")
         time_final = datetime.datetime.now()
         self.logger.log_time_elapsed("calculate_argmin_Q::time for getting possible actions", (time_final - time_initial).total_seconds())
 
@@ -241,14 +244,14 @@ class LrtdpTvmaAlgorithm():
         return most_probable_transition_to_return
 
 
-    def lrtdp_tvma(self):
+    def solve(self):
         number_of_trials = 0
-        self.occupancy_map.predict_occupancies(self.time_for_occupancies, self.time_for_occupancies + self.solution_time_bound)
-        self.occupancy_map.calculate_current_occupancies(self.time_for_occupancies)
+        print("Predicting occupancies from time ", self.time_for_occupancies, " to ", self.planner_time_bound)
+        self.occupancy_map.predict_occupancies(100)
+        self.occupancy_map.calculate_current_occupancies()
         initial_current_time = datetime.datetime.now()
         # for edge_id in self.occupancy_map.get_edges().keys():
         #     # print the current occupancies for each edge
-        # occ = self.occupancy_map.get_current_occupancies(edge_id)
         # if occ is not None:
         #     print("Edge: ", edge_id, "occupancy levels: ", occ)
             # print("Edge: ", edge_id, "occupancy levels: ", occ)
@@ -280,9 +283,7 @@ class LrtdpTvmaAlgorithm():
             #     print("Policy has changed.", old_policy, "**", old_time, "->", self.policy[self.vinitState.to_string()][2], "**", self.policy[self.vinitState.to_string()][0])
             old_policy = self.policy[self.vinitState.to_string()][2] if self.vinitState.to_string() in self.policy else None
             old_time = self.policy[self.vinitState.to_string()][0] if self.vinitState.to_string() in self.policy else None
-        print(str(number_of_trials) + " trials")
-        print(len(self.policy), "states in policy")
-        print(len(self.valueFunction), "states in value function")
+        print("exit reason:", "solved" if self.solved(self.vinitState) else "time limit reached")
         return self.solved(self.vinitState)
 
 
@@ -321,7 +322,9 @@ class LrtdpTvmaAlgorithm():
                 time_final = datetime.datetime.now()
                 self.logger.log_time_elapsed("lrtdp_tvma_trial::time for transition selection", (time_final - time_initial).total_seconds())
                 time_initial = datetime.datetime.now()
+                old_state = state
                 state = self.mdp.compute_next_state(state, transition_selected)
+                self.policy[old_state.to_string()].append(state)
                 time_final = datetime.datetime.now()
                 self.logger.log_time_elapsed("lrtdp_tvma_trial::time for next state computation", (time_final - time_initial).total_seconds())
                 # print("next state: ", state.to_string())

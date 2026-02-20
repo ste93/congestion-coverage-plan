@@ -3,12 +3,11 @@ import math
 import congestion_coverage_plan.utils.Logger as Logger 
 
 class State:
-    def __init__(self, vertex, time, visited_vertices, explained_vertices, last_action=None):
+    def __init__(self, vertex, time, visited_vertices, pois_explained=None):
         self._vertex = vertex
         self._time = time
         self._visited_vertices = visited_vertices
-        self._explained_vertices = explained_vertices
-        self._last_action = last_action
+        self.pois_explained = pois_explained
         self._id = self._calculate_id()
 
     def __eq__(self, other):
@@ -27,10 +26,12 @@ class State:
         visited_vertices_string = ""
         for vertex in sorted(self._visited_vertices):
             visited_vertices_string = visited_vertices_string + " " + str(vertex)
-        return "--current vertex:-- " + str(self._vertex) + " --current time:-- " + str(math.floor(self._time * 100)/100) + " --already visited vertices:-- " + visited_vertices_string
-
-    def get_id(self):
-        return self._id
+        if self.pois_explained is not None:
+            pois_explained_string = ""
+            for poi in sorted(self.pois_explained):
+                pois_explained_string = pois_explained_string + " " + str(poi)
+            return "--current vertex:-- " + str(self._vertex) + " --current time:-- " + str(math.floor(self._time * 100)/100) + " --already visited vertices:-- " + visited_vertices_string + " --pois explained:-- " + pois_explained_string
+        return "--current vertex:-- " + str(self._vertex) + " --current time:-- " + str(math.floor(self._time * 100)/100) + " --already visited vertices:-- " + visited_vertices_string + " --pois explained:-- None"
 
     # getters
     def get_vertex(self):
@@ -47,6 +48,12 @@ class State:
 
     def get_last_action(self):
         return self._last_action
+
+    def get_pois_explained(self):
+        return self.pois_explained
+
+    def get_id(self):
+        return self._id
 
 
 class Transition:
@@ -97,16 +104,20 @@ class Transition:
 
 
 class MDP:
-    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, logger=None):
+    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, explain_time, logger=None):
         self.occupancy_map = occupancy_map
         self.time_start = time_start
         self.time_for_occupancies = time_for_occupancies
         self._wait_time = wait_time
+        self._explain_time = explain_time
         if logger is not None:
             self.logger = logger
         else:
             self.logger = Logger.Logger(print_time_elapsed=False)
 
+
+    def get_explain_time(self):
+        return self._explain_time
 
 
     def compute_transition(self, state,  edge, occupancy_level, transitions_list):
@@ -143,7 +154,7 @@ class MDP:
 
         edge_limits = self.occupancy_map.find_edge_limit(edge.get_id())[occupancy_level]
         if time - self.time_for_occupancies < 1:
-            occupancies = self.occupancy_map.get_current_occupancies(time)
+            occupancies = self.occupancy_map.get_current_occupancies()
             edge_occupancy = 0
             if edge.get_id() not in occupancies.keys():
                 if occupancy_level == self.occupancy_map.get_occupancy_levels()[0]:
@@ -195,6 +206,10 @@ class MDP:
         if action == "wait":
             # start, end, action, cost, probability, occupancy_level
             return [Transition(state.get_vertex(), state.get_vertex(), "wait", self._wait_time, 1, "none")]
+        elif action == "explain":
+            return [Transition(state.get_vertex(), state.get_vertex(), "explain", self._explain_time, 1, "none")]
+        elif action == "end":
+            return [Transition(state.get_vertex(), state.get_vertex(), "end", 99999999, 1, "none")]
         else:
             # print("action:", action, "state", state.to_string())
             transitions = []
@@ -207,8 +222,19 @@ class MDP:
                 pairs.append((edge, occupancy_level))
 
             for item in pairs:
-                self.compute_transition(State(state.get_vertex(), state.get_time(), state.get_visited_vertices(), state.get_last_action()), item[0], item[1], transitions)
+                self.compute_transition(State(state.get_vertex(), state.get_time(), state.get_visited_vertices(), state.get_pois_explained()), item[0], item[1], transitions)
             return transitions
+
+
+    def get_possible_actions_museum(self, state):
+        # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ) - state.get_visited_vertices()) + ["wait"]
+        actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy()))
+        vertex = self.occupancy_map.find_vertex_from_id(state.get_vertex())
+        if vertex.get_poi_number() is not None and (vertex.get_poi_number() not in state.get_pois_explained()):
+            actions.append("explain")
+        actions.append("end")
+        # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy()))
+        return actions
 
 
     def get_possible_actions(self, state):
@@ -227,6 +253,38 @@ class MDP:
         return State(transition.get_end(), state.get_time() + transition.get_cost(), visited_vertices, transition.get_action())
 
 
+
+    def compute_next_state_museum(self, state, transition):
+        #returns a single next state
+        if transition.get_action() == "explain":
+            current_vertex = self.occupancy_map.find_vertex_from_id(state.get_vertex())
+            pois_explained = state.get_pois_explained().union(set([current_vertex.get_poi_number()]))
+            
+            print("Explaining POI:", current_vertex.get_poi_number(), "Total explained:", pois_explained)
+            return State(vertex=state.get_vertex(), 
+                         time=state.get_time() + transition.get_cost(), 
+                         visited_vertices=state.get_visited_vertices(), 
+                         pois_explained=pois_explained)
+        visited_vertices = state.get_visited_vertices() | set([transition.get_end()])
+        return State(vertex=transition.get_end(), 
+                     time=state.get_time() + transition.get_cost(), 
+                     visited_vertices=visited_vertices, 
+                     pois_explained=state.get_pois_explained())
+
+
+
+    def solved_museum(self, state):
+        # difference = len(self.occupancy_map.get_vertices().keys()) - len(state.get_visited_vertices())
+        
+        if state.get_vertex() not in self.occupancy_map.get_final_goal_vertices():
+            return False
+        # difference = len(self.occupancy_map.get_pois_set()) - len(state.get_pois_explained())
+        for poi in self.occupancy_map.get_pois_set():
+            if poi not in state.get_pois_explained():
+                return False
+
+        # solved = difference == 0 
+        return True
 
 
     def solved(self, state):

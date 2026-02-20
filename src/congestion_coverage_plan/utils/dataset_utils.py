@@ -186,3 +186,9 @@ def convert_atc_dataset(filename_in, filename_out):
 def create_folder(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+
+def convert_vx_vy_to_velocity_motion_angle(vx, vy):
+    velocity = np.sqrt(vx**2 + vy**2)
+    motion_angle = np.arctan2(vy, vx)
+    return velocity, motion_angle
