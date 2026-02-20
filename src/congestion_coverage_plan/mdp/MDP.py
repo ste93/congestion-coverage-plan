@@ -176,7 +176,7 @@ class MDP:
 
 
     def calculate_transition_cost(self, edge, time, occupancy_level):
-        return self.occupancy_map.get_edge_traverse_time(edge.get_id())[occupancy_level]
+        return self.occupancy_map.get_edge_traverse_times(edge.get_id())[occupancy_level]
 
 
     def get_possible_transitions_from_action(self, state, action, time_bound):

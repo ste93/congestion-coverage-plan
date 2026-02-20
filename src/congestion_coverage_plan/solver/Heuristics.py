@@ -115,7 +115,7 @@ class Heuristics():
                     mst_matrix_line.append(0)
                 elif self.occupancy_map.find_edge_from_position(vertex, vertex2) is not None:
                     edge_id = self.occupancy_map.find_edge_from_position(vertex, vertex2).get_id()
-                    mst_matrix_line.append(self.occupancy_map.get_edge_traverse_time(edge_id)['zero'])
+                    mst_matrix_line.append(self.occupancy_map.get_edge_traverse_times(edge_id)['zero'])
                 else:
                     mst_matrix_line.append(99999999)
             mst_matrix.append(mst_matrix_line)

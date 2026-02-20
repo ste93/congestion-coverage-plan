@@ -46,7 +46,7 @@ class Simulator:
         edge_occupancy = 0
         if edge_name in occupancies.keys():
             edge_occupancy = occupancies[edge_name]
-        edge_traverse_time = self._occupancy_map.get_edge_traverse_time(edge_name)
+        edge_traverse_time = self._occupancy_map.get_edge_traverse_times(edge_name)
         traverse_time = edge_traverse_time['zero'] + edge_occupancy* self._occupancy_map.get_people_collision_cost()
         return traverse_time, edge_occupancy
 
