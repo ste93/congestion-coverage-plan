@@ -10,7 +10,7 @@ from congestion_coverage_plan.utils import dataset_utils
 from congestion_coverage_plan.tsp.tsp import *
 from congestion_coverage_plan.utils import Logger
 from congestion_coverage_plan.hamiltonian_path.hamiltonian_path import * 
-from congestion_coverage_plan.SimulatorCommon import simulate_generic
+from congestion_coverage_plan.simulator.SimulatorCommon import simulate_generic
 from times import get_times_atc
 
 
@@ -101,38 +101,11 @@ def create_madama_with_name(filename,
                      output_folder=output_folder)
 
 def print_usage():
-    print("")
-    print("Usage: python main.py show <occupancy_map_file> [--show_vertex_names] or")
-    print("python main.py save <occupancy_map_file> [--show_vertex_names] or")
-    print("python main.py run --map <map_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --time_bound_lrtdp [time_bound_lrtdp] --time_bound_real [time_bound_real] --heuristic [heuristic_function] --times [time_list]")
-    print("Example: python main.py run --map atc_corridor_11 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --time_bound_lrtdp 350 --time_bound_real 10000 --heuristic mst_shortest_path --times 0.0")
-    print("Example: python main.py run --map madama_21 --algorithms lrtdp --convergence_threshold 2.5 --wait_time 20 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py run --map madama_21 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 10 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py run --map atc_corridor_11 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 1 --time_bound_lrtdp 350 --time_bound_real 10000")
-    print("Example: python main.py show --map atc_corridor_11 --show_vertex_names")
-    print("Example: python main.py save --map atc_corridor_11 --show_vertex_names")
-    print("occupancy_map_file is one of the files in data")
-    print("available heuristic functions: teleport, mst_shortest_path, mst, hamiltonian_path, hamiltonian_path_with_shortest_path")
-    print("function_name is one of the functions defined below")
-    print("tsp, lrtdp, lrtdp_pwm are optional, if not provided, all algorithms will be run")
-    print("convergence_threshold is optional, default is 2.5")
-    print("wait_time is optional, default is 10")
-    print("Available functions: ")
-    print("atc_corridor_11")
-    print("atc_corridor_16")
-    print("atc_corridor_21")
-    print("atc_corridor_26")
-    print("madama_11")
-    print("madama_16")
-    print("madama_21")
-    print("madama_26")
-    print("madama_doors_16")
-    print("madama_doors_21")
-    print("madama_doors_26")
-    print("madama_sequential_11")
-    print("madama_sequential_16")
-    print("madama_sequential_21")
-    print("madama_sequential_26")
+    print("Usage:")
+    print("python main.py run --map [map_name] --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --solution_time_bound [solution_time_bound] --planning_time_bound [planning_time_bound] --heuristic [heuristic_function] --results_folder [results_folder]")
+    print("python main.py show --map [map_name] --show_vertex_names")
+    print("python main.py save --map [map_name] --show_vertex_names")
+    print("python main.py create --occupancy_map_definition_name [name] --base_folder [folder] --occupancy_levels [levels] --cliff_predictor_name [name]")
 
 
 
@@ -162,21 +135,6 @@ if __name__ == "__main__":
         predictor = create_madama_cliff_predictor()
     if args[-1] == "--show_vertex_names":
         show_vertex_names = True
-    # param parser, optins are:
-    # show <occupancy_map_file> [show_vertex_names]
-    # save <occupancy_map_file> [show_vertex_names]
-    # run <function_name> --algorithms [tsp] [lrtdp] [lrtdp_pwm] --convergence_threshold [convergence_threshold] --wait_time [wait_time] --solution_time_bound [solution_time_bound] --planning_time_bound [planning_time_bound]
-    # occupancy_map_file is one of the files in data
-    # function_name is one of the functions defined below
-    # tsp, lrtdp, lrtdp_pwm are optional, if not provided, all algorithms will be run
-    # convergence_threshold is optional, default is 2.5
-    # wait_time is optional, default is 10
-    # example: python main_simulator_common.py run --map atc_corridor_11 --algorithms tsp lrtdp --convergence_threshold 2.5 --wait_time 10
-    # example: python main_simulator_common.py run --map madama_21 --algorithms lrtdp_pwm --convergence_threshold 2.5 --wait_time 10
-    # example: python main_simulator_common.py run --map madama_21 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 10
-    # example: python main_simulator_common.py run --map atc_corridor_11 --algorithms tsp lrtdp lrtdp_pwm --convergence_threshold 2.5 --wait_time 1
-    # example: python main_simulator_common.py show --map atc_corridor_11 --show_vertex_names
-    # example: python main_simulator_common.py save --map atc_corridor_11 --show_vertex_names
 
 
     if len(args) > 2 and args[0] == "run":
@@ -332,10 +290,6 @@ if __name__ == "__main__":
 
 
     elif len(args) >= 2 and args[0] == "show":
-
-        
-
-
         path = "data/occupancy_maps/occupancy_maps_" + map_name + "/occupancy_map_" + map_name + "_2_levels.yaml"
         print("Loading occupancy map from:", path)
         occupancy_map = OccupancyMap(predictor)
@@ -348,9 +302,9 @@ if __name__ == "__main__":
         path = "data/occupancy_maps_" + map_name + "/occupancy_map_" + map_name + "_2_levels.yaml"
         print("Loading occupancy map from:", path)
         predictor.display_cliff_map()
-        
-    elif len(args) >= 2 and args[0] == "save":
 
+
+    elif len(args) >= 2 and args[0] == "save":
         path = "data/occupancy_maps/occupancy_maps_" + map_name + "/occupancy_map_" + map_name + "_2_levels.yaml"
         print("Loading occupancy map from:", path)
         occupancy_map = OccupancyMap(predictor)
@@ -359,9 +313,10 @@ if __name__ == "__main__":
         occupancy_map.save_figure(occupancy_map.get_name() + ".png")
 
 
-    # elif len(args) >= 2 and args[0] == "create":
+    elif len(args) >= 2 and args[0] == "create":
+        # inputs required are: occupancy_map_definition_name, base_folder, occupancy_levels, cliff_predictor_name
+        pass 
 
-        
 
     else:
         print("Invalid arguments.")

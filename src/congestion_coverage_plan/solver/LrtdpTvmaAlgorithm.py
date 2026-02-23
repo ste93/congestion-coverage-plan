@@ -37,14 +37,16 @@ class LrtdpTvmaAlgorithm():
             self.vinitState = initial_state
             self.initial_time = time_for_occupancies
         else:
-            self.vinitState = State(initial_state_name, 
-                                   0,
-                                    set([initial_state_name]), None)
+            self.vinitState = State(vertex=initial_state_name, 
+                                    time=0, 
+                                    visited_vertices=set([initial_state_name]), 
+                                    pois_explained=set())
         self.vinitStateName = initial_state_name
         self.planning_time_bound = planning_time_bound
         self.solution_time_bound = solution_time_bound
         self.convergenceThresholdGlobal = convergence_threshold
         self.policy = {}
+        self.policy_to_execute = {}
         self.valueFunction = {}
         self.action_costs = {}
         self.solved_set = set()
@@ -107,7 +109,10 @@ class LrtdpTvmaAlgorithm():
 
     def calculate_argmin_Q(self, state):
         qvalues = []
-        state_internal = State(state.get_vertex(), state.get_time(), state.get_visited_vertices().copy(), state.get_pois_explained().copy())
+        state_internal = State(vertex=state.get_vertex(), 
+                               time=state.get_time(), 
+                               visited_vertices=state.get_visited_vertices().copy(), 
+                               pois_explained=state.get_pois_explained().copy())
         time_initial = datetime.datetime.now()
         possible_actions = self.mdp.get_possible_actions(state_internal)
         if not possible_actions:
@@ -246,54 +251,28 @@ class LrtdpTvmaAlgorithm():
 
     def solve(self):
         number_of_trials = 0
-        print("Predicting occupancies from time ", self.time_for_occupancies, " to ", self.planner_time_bound)
+        print("Predicting occupancies from time ", self.time_for_occupancies, " to ", self.time_for_occupancies + 100)
+        self.occupancy_map.compute_current_tracks()
         self.occupancy_map.predict_occupancies(100)
         self.occupancy_map.calculate_current_occupancies()
         initial_current_time = datetime.datetime.now()
-        # for edge_id in self.occupancy_map.get_edges().keys():
-        #     # print the current occupancies for each edge
-        # if occ is not None:
-        #     print("Edge: ", edge_id, "occupancy levels: ", occ)
-            # print("Edge: ", edge_id, "occupancy levels: ", occ)
         print("LRTDP TVMA started at: ", initial_current_time, "convergence threshold:", self.convergenceThresholdGlobal, "wait_time:", self._wait_time, "planner time bound:", self.solution_time_bound, "real time bound:", self.planning_time_bound, "initial time for occupancies:", self.time_for_occupancies)
-        average_trial_time = 0
-        old_policy = None
-        old_time = None
         while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.planning_time_bound):
-            time_init_trial = datetime.datetime.now()
-            # print("Trial number: ", number_of_trials)
             self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.solution_time_bound)
-            # print(self.valueFunction)
-            # print(self.policy)
-            # for item in self.policy.keys():
-            #     print("***state***", item, "***qvalue***", self.policy[item][0], "***action***", self.policy[item][2])
-            time_final_trial = datetime.datetime.now()
-            self.logger.log_time_elapsed("trial time", (time_final_trial - time_init_trial).total_seconds())
-            # print("Trial ", number_of_trials, " time: ", (time_final_trial - time_init_trial).total_seconds())
             number_of_trials += 1
-            average_trial_time = (average_trial_time * (number_of_trials - 1) + (time_final_trial - time_init_trial).total_seconds()) / number_of_trials
             if number_of_trials % 50 == 0:
-                print("Average trial time after " + str(number_of_trials) + " trials: ", average_trial_time)
                 print(len(self.policy), "states in policy")
-                # print("Current policy: ", self.policy)
                 print(len(self.valueFunction), "states in value function")
-            # if old_policy == self.policy[self.vinitState.to_string()][2] and old_time == self.policy[self.vinitState.to_string()][0]:
-            #     print("Policy has not changed.", old_policy, "**", old_time)
-            # else:
-            #     print("Policy has changed.", old_policy, "**", old_time, "->", self.policy[self.vinitState.to_string()][2], "**", self.policy[self.vinitState.to_string()][0])
-            old_policy = self.policy[self.vinitState.to_string()][2] if self.vinitState.to_string() in self.policy else None
-            old_time = self.policy[self.vinitState.to_string()][0] if self.vinitState.to_string() in self.policy else None
         print("exit reason:", "solved" if self.solved(self.vinitState) else "time limit reached")
+        print("number of trials:", number_of_trials)
+        print("time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
         return self.solved(self.vinitState)
 
 
     def lrtdp_tvma_trial(self, vinitStateParameter, thetaparameter, solution_time_bound):
-            # print("trial started")
             visited = [] # this is a stack
             state = vinitStateParameter
             while not self.solved(state):
-                # print("checking state:", state.to_string())
-
                 visited.append(state)
                 self.update(state)
                 self.policy[state.to_string()] = self.calculate_argmin_Q(state)
@@ -301,40 +280,20 @@ class LrtdpTvmaAlgorithm():
                     ######## should there be here a bellamn backup?
                     break
                 # perform bellman backup and update policy
-                time_initial = datetime.datetime.now()
-                time_final = datetime.datetime.now()
-                self.logger.log_time_elapsed("lrtdp_tvma_trial::time for argmin", (time_final - time_initial).total_seconds())
-                # print("state: ", state.to_string())
-                # print("action: ", self.policy[state.to_string()][2])
-                time_initial = datetime.datetime.now()
                 action = self.policy[state.to_string()][2]
+                # print("state:", state.to_string(), "action:", action)
                 transitions = self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound)
                 if not transitions:
                     print("lrtdp_tvma_trial::No transitions found for state: ", state.to_string())
                     break
-                time_final = datetime.datetime.now()
-                self.logger.log_time_elapsed("lrtdp_tvma_trial::time for transitions", (time_final - time_initial).total_seconds())
-                # for t in transitions:
-                #     print("transition: ", t.to_string())
-                time_initial = datetime.datetime.now()
                 transition_selected = np.random.choice(transitions, p=[t.get_probability() for t in transitions])
-
-                time_final = datetime.datetime.now()
-                self.logger.log_time_elapsed("lrtdp_tvma_trial::time for transition selection", (time_final - time_initial).total_seconds())
-                time_initial = datetime.datetime.now()
                 old_state = state
                 state = self.mdp.compute_next_state(state, transition_selected)
-                self.policy[old_state.to_string()].append(state)
-                time_final = datetime.datetime.now()
-                self.logger.log_time_elapsed("lrtdp_tvma_trial::time for next state computation", (time_final - time_initial).total_seconds())
-                # print("next state: ", state.to_string())
-            time_initial = datetime.datetime.now()
+                self.policy_to_execute[old_state.to_string()] = (self.policy[old_state.to_string()][0], state, action)
+                
+                # Policy entries are (value, state, action); keep them immutable for callers.
+                
             while visited:
                 state = visited.pop()
-                # print("in while 2")
                 if not self.check_solved(state, thetaparameter):
-                    # print("State not solved: ", state.to_string(), "======", self.residual(state), "GOAL?  ", self.goal(state))
-                    # print(len(visited), "states in visited stack")
                     break
-            time_final = datetime.datetime.now()
-            self.logger.log_time_elapsed("lrtdp_tvma_trial::time for backward check", (time_final - time_initial).total_seconds())

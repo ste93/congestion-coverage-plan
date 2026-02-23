@@ -23,6 +23,7 @@ class CliffPredictor:
         self.method = method
         self.dataset = dataset
         self.fig_size = fig_size # [xmin, xmax, ymin, ymax]
+        print("Loading cliff map data from file:", mod_file)
         self.cliff_map_data = dataset_utils.read_cliff_map_data(mod_file)
         # print(fig_size)
         # self.human_traj_data = utils.read_iit_human_traj_data(self.ground_truth_data_file)

@@ -87,6 +87,16 @@ def read_human_traj_data_from_file(human_traj_file):
 
     return data
 
+
+def read_human_traj_data_from_file_madama(human_traj_file):
+    data = pd.read_csv(human_traj_file, header=None)
+    data.columns = ["time", "person_id", "x", "y", "vx", "vy"]
+    # data = millimeter_to_meter(data, ["x", "y", "z", "velocity"])
+
+    return data
+
+
+
 def read_cliff_map_data(cliff_map_file):
     data = pd.read_csv(cliff_map_file, header=None)
     data.columns = ["x", "y", "motion_angle", "velocity",

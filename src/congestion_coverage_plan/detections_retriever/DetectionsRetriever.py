@@ -2,10 +2,10 @@
 # it keeps the latest detection messages in a member variable
 
 from threading import Lock
-from src.congestion_coverage_plan_museum.utils import dataset_utils
+from src.congestion_coverage_plan.utils import dataset_utils
 from static_devices_msgs.msg import DetectionsArray, SingleDetection
 from matplotlib import pyplot as plt
-from congestion_coverage_plan.utils.dataset_utils import read_human_traj_data_from_file
+from congestion_coverage_plan.utils.dataset_utils import read_human_traj_data_from_file, read_human_traj_data_from_file_madama
 
 class Detection:
     def __init__(self, person_id, positionx, positiony, timestamp, velocity, motion_angle):
@@ -16,6 +16,11 @@ class Detection:
         self.velocity = velocity
         self.motion_angle = motion_angle
 
+    def to_string(self):
+        return f"Detection(person_id={self.person_id}, position=({self.positionx}, {self.positiony}), timestamp={self.timestamp}, velocity={self.velocity}, motion_angle={self.motion_angle})"
+    
+    def __str__(self):
+        return self.to_string()
 
 class DetectionsRetriever:
     def __init__(self, node=None, topic_name="static_tracks", queue_size=10):
@@ -34,7 +39,11 @@ class DetectionsRetriever:
         self.start_with_node(node)
 
 
-        
+    def get_current_time(self):
+        if self._node is not None:
+            return self._node.get_clock().now().to_msg().sec
+        else:
+            return None
 
 
     def _callback(self, msg):
@@ -69,6 +78,7 @@ class DetectionsRetriever:
             self._detections = detections_local
             self._current_occupancies = current_occupancies_local
 
+
     def check_for_stale_detections(self):
         if len(self._detections) > 0:
             latest_timestamp = max(detections[0].timestamp for detections in self._detections.values())
@@ -79,15 +89,18 @@ class DetectionsRetriever:
                         self._detections = {}
                         self._current_occupancies = {}
 
+
     def get_detections(self):
         self.check_for_stale_detections()
         with self._lock:
             return self._detections
 
+
     def get_current_occupancies(self):
         self.check_for_stale_detections()
         with self._lock:
             return self._current_occupancies
+
         
     def start_with_node(self, node):
         """Attach to an existing node (create subscription if needed)."""
@@ -108,11 +121,18 @@ class FakeDetectionsRetriever:
         self.timestamp = timestamp
 
     def load_dataset(self):
-        self.human_traj_data = read_human_traj_data_from_file(self._dataset_filename)
+        if "madama" in self._dataset_filename:
+            self.human_traj_data = read_human_traj_data_from_file_madama(self._dataset_filename)
+        else:
+            self.human_traj_data = read_human_traj_data_from_file(self._dataset_filename)
 
 
     def set_timestamp(self, timestamp):
         self.timestamp = timestamp
+
+
+    def get_current_time(self):
+        return self.timestamp
 
 
     def get_detections(self):
@@ -120,11 +140,15 @@ class FakeDetectionsRetriever:
         people_ids = list(human_traj_data_by_time.person_id.unique())
         tracks = {}
         self.people_trajectories = {}
+        # print("field names:", self.human_traj_data.columns)
 
         for id in people_ids:
             human_traj_data_by_person_id = self.human_traj_data.loc[self.human_traj_data['person_id'] == id]
-            human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "vx", "vy"]].to_numpy()
-            print("human_traj_array:", human_traj_array)
+            if "vx" in self.human_traj_data.columns and "vy" in self.human_traj_data.columns:
+                human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "vx", "vy", "person_id"]].to_numpy()
+            else:
+                human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "velocity", "motion_angle", "person_id"]].to_numpy()
+            # print("human_traj_array:", human_traj_array)
             track_before_now = human_traj_array[human_traj_array[:, 0] <= self.timestamp]
             track_filtered = track_before_now[-(self._queue_size + 1):]
             if len(track_filtered) >= self._queue_size:
@@ -134,9 +158,12 @@ class FakeDetectionsRetriever:
         for track in tracks:
             detections_list = []
             for point in tracks[track]:
-                velocity, motion_angle = dataset_utils.convert_vx_vy_to_velocity_motion_angle(point[3], point[4])
+                velocity = point[3]
+                motion_angle = point[4]
+                if "vx" in self.human_traj_data.columns and "vy" in self.human_traj_data.columns:
+                    velocity, motion_angle = dataset_utils.convert_vx_vy_to_velocity_motion_angle(point[3], point[4])
                 detection_obj = Detection(
-                    person_id=0,
+                    person_id=point[5],
                     positionx=point[1],
                     positiony=point[2],
                     timestamp=point[0],
@@ -154,14 +181,22 @@ class FakeDetectionsRetriever:
         people_ids = list(human_traj_data_by_time.person_id.unique())
         current_occupancies_local = []
         for id in people_ids:
+            
             human_traj_data_by_person_id = self.human_traj_data.loc[self.human_traj_data['person_id'] == id]
-            human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "vx", "vy"]].to_numpy()
+            if "vx" in self.human_traj_data.columns and "vy" in self.human_traj_data.columns:
+                human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "vx", "vy", "person_id"]].to_numpy()
+            else:
+                human_traj_array = human_traj_data_by_person_id[["time", "x", "y", "velocity", "motion_angle", "person_id"]].to_numpy()
             track_before_now = human_traj_array[human_traj_array[:, 0] <= self.timestamp]
             if len(track_before_now) > 0:
                 last_position = track_before_now[-1]
-                velocity, motion_angle = dataset_utils.convert_vx_vy_to_velocity_motion_angle(last_position[3], last_position[4])
+                if "vx" in self.human_traj_data.columns and "vy" in self.human_traj_data.columns:
+                    velocity, motion_angle = dataset_utils.convert_vx_vy_to_velocity_motion_angle(last_position[3], last_position[4])
+                else:
+                    velocity = last_position[3]
+                    motion_angle = last_position[4]
                 current_occupancies_local.append(Detection(
-                    person_id=id,
+                    person_id=last_position[5],
                     positionx=last_position[1],
                     positiony=last_position[2],
                     timestamp=self.timestamp,

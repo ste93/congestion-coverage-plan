@@ -416,7 +416,11 @@ class TopologicalMap:
         with open(filename, 'r') as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
             self.name = data['name']
-            self.vertices = {vertex['id']: Vertex(vertex['id'], vertex['posx'], vertex['posy'], vertex['is_poi'], vertex['poi_number'], vertex['is_final_goal']) for vertex in data['vertices']}
+            if 'is_poi' not in data['vertices'][0]:
+                for vertex in data['vertices']:
+                    self.vertices[vertex['id']] = Vertex(vertex['id'], vertex['posx'], vertex['posy'])
+            else:
+                self.vertices = {vertex['id']: Vertex(vertex['id'], vertex['posx'], vertex['posy'], vertex['is_poi'], vertex['poi_number'], vertex['is_final_goal']) for vertex in data['vertices']}
             for edge in data['edges']:
                 start_vertex = self.find_vertex_from_id(edge['start'])
                 end_vertex = self.find_vertex_from_id(edge['end'])

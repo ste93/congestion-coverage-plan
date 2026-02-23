@@ -22,21 +22,22 @@ class Heuristics():
         # self.logger = logger if logger is not None else Logger()
         self.shortest_paths_matrix = self.calculate_shortest_path_matrix()
         self.minimum_edge_entering_vertices_dict = self.minimum_edge_entering_vertices()
+        heuristic_function_name = heuristic_function
         self.heuristic_function = None
-        if heuristic_function == "teleport":
+        if heuristic_function_name == "teleport":
             self.heuristic_function = self.heuristic_teleport
-        elif heuristic_function == "mst_shortest_path":
+        elif heuristic_function_name == "mst_shortest_path":
             self.heuristic_function = self.heuristic_mst_shortest_path
-        elif heuristic_function == "mst":
+        elif heuristic_function_name == "mst":
             self.heuristic_function = self.heuristic_mst
-        elif heuristic_function == "hamiltonian_path":
+        elif heuristic_function_name == "hamiltonian_path":
             self.heuristic_function = self.heuristic_hamiltonian_path
-        elif heuristic_function == "hamiltonian_path_with_shortest_path":
+        elif heuristic_function_name == "hamiltonian_path_with_shortest_path":
             self.heuristic_function = self.heuristic_hamiltonian_path_with_shortest_path
-        if heuristic_function == "madama_experiments":
+        elif heuristic_function_name == "madama_experiments":
             self.heuristic_function = self.heuristic_experiments
         else:
-            print("Heuristic function not recognized")
+            print("Heuristic function not recognized", heuristic_function_name, "available heuristic functions: teleport, mst_shortest_path, mst, hamiltonian_path, hamiltonian_path_with_shortest_path, madama_experiments")
             sys.exit(1)
 
 
@@ -121,7 +122,7 @@ class Heuristics():
                     mst_matrix_line.append(0)
                 elif self.occupancy_map.find_edge_from_position(vertex, vertex2) is not None:
                     edge_id = self.occupancy_map.find_edge_from_position(vertex, vertex2).get_id()
-                    mst_matrix_line.append(self.occupancy_map.get_edge_traverse_time(edge_id)['zero'])
+                    mst_matrix_line.append(self.occupancy_map.get_edge_traverse_times(edge_id)['zero'])
                 else:
                     mst_matrix_line.append(99999999)
             mst_matrix.append(mst_matrix_line)

@@ -7,7 +7,7 @@ class State:
         self._vertex = vertex
         self._time = time
         self._visited_vertices = visited_vertices
-        self.pois_explained = pois_explained
+        self.pois_explained = pois_explained if pois_explained is not None else set()
         self._id = self._calculate_id()
 
     def __eq__(self, other):
@@ -104,7 +104,7 @@ class Transition:
 
 
 class MDP:
-    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, explain_time, logger=None):
+    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, explain_time, logger=None, do_museum_trials=False):
         self.occupancy_map = occupancy_map
         self.time_start = time_start
         self.time_for_occupancies = time_for_occupancies
@@ -114,6 +114,18 @@ class MDP:
             self.logger = logger
         else:
             self.logger = Logger.Logger(print_time_elapsed=False)
+
+        self.solved = None
+        self.compute_next_state = None
+        self.get_possible_actions = None
+        if do_museum_trials:
+            self.solved = self.solved_museum
+            self.compute_next_state = self.compute_next_state_museum
+            self.get_possible_actions = self.get_possible_actions_museum
+        else:            
+            self.solved = self.solved_coverage
+            self.compute_next_state = self.compute_next_state_coverage
+            self.get_possible_actions = self.get_possible_actions_coverage
 
 
     def get_explain_time(self):
@@ -195,7 +207,7 @@ class MDP:
 
 
     def calculate_transition_cost(self, edge, time, occupancy_level):
-        return self.occupancy_map.get_edge_traverse_time(edge.get_id())[occupancy_level]
+        return self.occupancy_map.get_edge_traverse_times(edge.get_id())[occupancy_level]
 
 
     def get_possible_transitions_from_action(self, state, action, time_bound):
@@ -222,7 +234,11 @@ class MDP:
                 pairs.append((edge, occupancy_level))
 
             for item in pairs:
-                self.compute_transition(State(state.get_vertex(), state.get_time(), state.get_visited_vertices(), state.get_pois_explained()), item[0], item[1], transitions)
+                self.compute_transition(State(vertex=state.get_vertex(), 
+                                              time=state.get_time(), 
+                                              visited_vertices=state.get_visited_vertices(), 
+                                              pois_explained=state.get_pois_explained()), 
+                                        item[0], item[1], transitions)
             return transitions
 
 
@@ -237,7 +253,7 @@ class MDP:
         return actions
 
 
-    def get_possible_actions(self, state):
+    def get_possible_actions_coverage(self, state):
         # actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ) - state.get_visited_vertices()) + ["wait"]
         actions = list(set(self.occupancy_map.get_edges_from_vertex(state.get_vertex()).copy() ))
         # if state.get_last_action() is not None and state.get_last_action() != "wait":
@@ -246,11 +262,14 @@ class MDP:
         return actions
 
 
-    def compute_next_state(self, state, transition):
+    def compute_next_state_coverage(self, state, transition):
         #returns a single next state
         visited_vertices = state.get_visited_vertices() | set([transition.get_end()])
 
-        return State(transition.get_end(), state.get_time() + transition.get_cost(), visited_vertices, transition.get_action())
+        return State(vertex=transition.get_end(), 
+                     time=state.get_time() + transition.get_cost(), 
+                     visited_vertices=visited_vertices, 
+                     pois_explained=state.get_pois_explained())
 
 
 
@@ -287,7 +306,9 @@ class MDP:
         return True
 
 
-    def solved(self, state):
+    def solved_coverage(self, state):
         difference = len(self.occupancy_map.get_vertices().keys()) - len(state.get_visited_vertices())
         solved = difference == 0
+        # print("Checking if solved, state:", state.to_string(), "difference:", difference, "solved:", solved)
+
         return solved

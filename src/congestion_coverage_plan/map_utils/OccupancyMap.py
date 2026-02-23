@@ -28,32 +28,32 @@ import sys
 class OccupancyMap(TopologicalMap):
     def __init__(self, cliffPredictor, occupancy_levels = ["zero", "one", "two"], people_cost = 10, logger=None, detections_retriever=None):
         self.name = ""
+        np.set_printoptions(suppress=True,formatter={'float_kind':'{:0.2f}'.format}) 
         self.vertex_occupancy = {}
         self.edge_occupancy = {}
         self.vertex_limits = {}
         self.edge_limits = {}
         self.edge_traverse_times = {}
         self.vertex_expected_occupancy = {}
-        self.edge_expected_occupancy = {}
+        self._edge_expected_occupancy = {}
         self.cliffPredictor = cliffPredictor
-        self.people_trajectories = {}
         self.people_predicted_positions = {}
         self.predicted_positions = None
-        self.current_occupancies = {}
         self.occupancy_levels = occupancy_levels
         # self.human_traj_data = read_human_traj_data_from_file(self.cliffPredictor.ground_truth_data_file)
-        self.already_predicted_times = set()
+        self._already_predicted_times = set()
         self.lock = asyncio.Lock()
         self.people_cost = people_cost
+        self._current_tracks = None
+        self._current_predictions = None
+        self._current_occupancies = None
+        self._current_time = None
+
         print("Detections retriever:", detections_retriever)
         if detections_retriever is not None:
             self.detections_retriever = detections_retriever
         else:
             self.detections_retriever = FakeDetectionsRetriever(self.cliffPredictor.ground_truth_data_file)
-            # self.detections_retriever = DetectionsRetriever()
-            # self.detections_retriever.start()
-            # self.human_traj_data = read_human_traj_data_from_file(self.cliffPredictor.ground_truth_data_file)
-
 
         if logger is not None:
             self.logger = logger
@@ -83,48 +83,12 @@ class OccupancyMap(TopologicalMap):
         return self.name
 
 
-    # add the traverse time for an edge
-    def add_edge_traverse_time(self, edge_id: str, occupancy_level: str, time: float):
-        # check if the edge exists
-        if self.find_edge_from_id(edge_id) is None:
-            return False
-        # add the edge traverse time
-        if edge_id not in self.edge_traverse_times.keys():
-            self.edge_traverse_times[edge_id] = {}
-        if occupancy_level in self.edge_traverse_times[edge_id].keys():
-            return False
-        self.edge_traverse_times[edge_id][occupancy_level] = time
-        return True
+    def get_people_collision_cost(self):
+        return self.people_cost
 
 
     def get_occupancy_levels(self):
         return self.occupancy_levels
-
-
-    # add the limits for vertices and edges
-    def add_vertex_limit(self, vertex_id: str, limit: int):
-        # check if the vertex exists
-        if self.find_vertex_from_id(vertex_id) is None:
-            return False
-        # add the vertex limit
-        self.vertex_limits[vertex_id] = limit
-        return True
-
-
-    def add_edge_limit(self, edge_id: str, limit: int):
-        # check if the edge exists
-        if self.find_edge_from_id(edge_id) is None:
-            return False
-        # add the edge limit
-        self.edge_limits[edge_id] = limit
-        return True
-
-
-    # find the limits for vertices and edges
-    def find_vertex_limit(self, vertex_id: str):
-        if vertex_id in self.vertex_limits:
-            return self.vertex_limits[vertex_id]
-        return None
 
 
     def find_edge_limit(self, edge_id: str):
@@ -133,19 +97,18 @@ class OccupancyMap(TopologicalMap):
         return 0
 
 
-    # save and load the occupancy map
-    def save_occupancy_map(self, filename: str):
-        self.save_topological_map(filename.split('.')[0] + "-topological." + filename.split('.')[1])
-        with open(filename, 'w') as f:
-            yaml.Dumper.ignore_aliases = lambda *args : True
-            yaml.dump({'name': self.name,
-                        'occupancy_levels': self.occupancy_levels,
-                        'edge_limits':  self.edge_limits,
-                        'edge_traverse_times': self.edge_traverse_times},
-                        f,
-                        default_flow_style=False)
-
-
+    # load the occupancy map from a yaml file, the file should have the following structure:
+    # name: map_name
+    # vertex_limits:
+    #   - id: uuidvertex
+    #     limit: n_people
+    # edge_limits:
+    #   - id: uuidedge
+    #     limit: n_people
+    # edge_traverse_times:
+    #   uuidedge:
+    #     high: time
+    #     low: time
     def load_occupancy_map(self, filename: str):
         print(filename)
         # try catch for loading the topological map and if it fails, print an error message and return false
@@ -163,163 +126,143 @@ class OccupancyMap(TopologicalMap):
         return True
 
 
-    # get the traverse time of an edge
-    def get_edge_traverse_time(self, edge_id: str):
+    # get the traverse times of an edge
+    def get_edge_traverse_times(self, edge_id: str):
         if edge_id in self.edge_traverse_times:
             return self.edge_traverse_times[edge_id]
         return None
 
 
-    def set_edge_limits(self, edge_id: str, limits_class: str, limits_values: list):
-        if not self.edge_limits[edge_id]:
-            self.edge_limits[edge_id] = {}
-        self.edge_limits[edge_id][limits_class] = limits_values
-
-
-    # get the occupancy of the vertices and edges
-    def get_edge_expected_occupancy(self, time: float, edge_id: str):
+    # get the expected occupancy of the edges
+    # used when we are in the future and we need to predict the occupancy, weighting the probability of the occupancy
+    # the expected occupancy is a dictionary with the following structure:
+    # {time: {uuidedge: {'high': n_people, 'low': n_people}, ....}, ....}
+    def get_edge_expected_occupancy(self, time, edge_id: str):
         time = math.trunc(time)
 
-        if time not in self.already_predicted_times:
-            self.assign_people_predictions_to_edge(time, edge_id)
-            self.predict_occupancies_for_edge(time, edge_id)
-            self.already_predicted_times.add(time)
+        if time not in self._already_predicted_times:
+            self._assign_people_predictions_to_edge(time, edge_id)
+            self._predict_occupancies_for_edge(time, edge_id)
+            self._already_predicted_times.add(time)
 
-        if time in self.edge_expected_occupancy:
-            if edge_id in self.edge_expected_occupancy[time]:
-                return self.edge_expected_occupancy[time][edge_id]
+        if time in self._edge_expected_occupancy:
+            if edge_id in self._edge_expected_occupancy[time]:
+                return self._edge_expected_occupancy[time][edge_id]
         
         return None
 
 
-    def get_vertex_expected_occupancy(self, time: float, vertex_id: str):
-        time = math.trunc(time)
-        if time in self.vertex_expected_occupancy:
-            if vertex_id in self.vertex_expected_occupancy[time]:
-                return self.vertex_expected_occupancy[time][vertex_id]
-        return None
-
-
-
-
-    # get the tracks of people by time
-    # return a dictionary of person_id to numpy array of positions
-
-    def get_current_tracks(self):
+    def compute_current_tracks(self):
         # get detections returns a dictionary of person_id to list of Detection objects, we need to convert it to a dictionary of person_id to numpy array of positions
+        self._current_time = self.detections_retriever.get_current_time()
+        # print("---------------- compute_current_tracks, current time:", self._current_time)
         self.human_traj_data = self.detections_retriever.get_detections()
-        # print("human_traj_data:", self.human_traj_data)
+
+        # print("human_traj_data _to_string:", self.human_traj_data.to_string())
         people_ids = self.human_traj_data.keys()
         tracks = {}
-        self.people_trajectories = {}
-
+        self._current_tracks = {}
         for id in people_ids:
+            # print(f"Person {id} trajectory:")
             human_traj_data_by_person_id = self.human_traj_data[id]
+            # for point in human_traj_data_by_person_id:
+                # print(f"Person {id} point: time={point.timestamp}, x={point.positionx}, y={point.positiony}, velocity={point.velocity}, motion_angle={point.motion_angle}")
             # convert from list of Detection to numpy array
             datatype = np.dtype([('timestamp', 'f8'), ('x', 'f8'), ('y', 'f8'), ('velocity', 'f8'), ('motion_angle', 'f8')])
             # local_trajectory = np.rec.array([])
             local_trajectory = []
             for detection in human_traj_data_by_person_id:
-                local_trajectory.append((float(detection.timestamp), float(detection.positionx), float(detection.positiony), float(detection.velocity), float(detection.motion_angle)))
-            human_traj_array = np.array(local_trajectory, dtype=datatype)
-            # filter the trajectory to be only before the time
-            track_before_now = human_traj_array
+                local_trajectory.append([float(detection.timestamp), float(detection.positionx), float(detection.positiony), float(detection.velocity), float(detection.motion_angle)])
+            # print(f"Person {id} local trajectory (list of lists):", local_trajectory)
+            # print(f"Person {id} human_traj_array (list of lists):", human_traj_array)
+            # Convert to tuples for structured array creation
+            human_traj_struct = np.array([tuple(row) for row in local_trajectory], dtype=datatype)
+            # print(f"Person {id} human_traj_struct (numpy structured array):", human_traj_struct)
+            # # filter the trajectory to be only before the time
+            # print("human_traj_array**:", human_traj_array)
+            # print("human_traj_array**:", human_traj_array[0])
+            # track_before_now = human_traj_array[human_traj_array[:, 0] <= self._current_time]
             # track_before_now = human_traj_array[human_traj_array[:, 0] <= time]
+            sorted_human_traj_array = human_traj_struct[np.argsort(human_traj_struct['timestamp'])]
+            track_before_now = sorted_human_traj_array[sorted_human_traj_array['timestamp'] <= self._current_time]
             track_filtered = track_before_now[-(self.cliffPredictor.observed_tracklet_length + 1):]
             if len(track_filtered) >= self.cliffPredictor.observed_tracklet_length:
                 tracks[id] = track_filtered
-
-        self.people_trajectories = tracks
-        return tracks
+        # print("current tracks @@@@@@@@@@@@@@@:", tracks)
+        # here is wrong!!!
+        self._current_tracks = tracks
 
 
     def calculate_current_occupancies(self):
-        current_occupancies = self.detections_retriever.get_current_occupancies()
-        self.current_occupancies = {}   
-        for item in current_occupancies:
-
-            for edge_id in self.edges.keys():
-                edge = self.edges[edge_id]
-                if edge.is_inside_area(item.positionx, item.positiony):
-                    if edge.get_id() not in self.current_occupancies:
-                        self.current_occupancies[edge.get_id()] = 0
-                    self.current_occupancies[edge.get_id()] += 1
-
-        return self.current_occupancies
+        self._current_occupancies = {}   
+        # use only the positions of the people at the current time, so we filter the trajectories to be only at the current time
+        # print(f"DEBUG: _current_tracks has {len(self._current_tracks)} people")
+        # print(f"DEBUG: _current_time = {self._current_time}")
+        # print(f"DEBUG: edges count = {len(self.edges)}")
+        
+        for person_id, item in self._current_tracks.items():
+            # print(f"DEBUG: Person {person_id} has {len(item)} track points")
+            for position in item:
+                time_diff = abs(position['timestamp'] - self._current_time)
+                # print(f"DEBUG: position timestamp={position['timestamp']}, diff={time_diff:.2f}")
+                if time_diff < 1:
+                    # print(f"DEBUG: Checking position x={position['x']}, y={position['y']}")
+                    for edge_id in self.edges.keys():
+                        edge = self.edges[edge_id]
+                        if edge.is_inside_area(position['x'], position['y']):
+                            # print(f"DEBUG: Position inside edge {edge.get_id()}")
+                            if edge.get_id() not in self._current_occupancies:
+                                self._current_occupancies[edge.get_id()] = 0
+                            self._current_occupancies[edge.get_id()] += 1
+        print("################ current occupancies:", self._current_occupancies)
 
 
     def get_current_occupancies(self):
-        return self.current_occupancies
+        return self._current_occupancies
     
 
     def plot_tracks_on_map(self):
         self.plot_topological_map(self.cliffPredictor.map_file, self.cliffPredictor.fig_size, self.name)
         
-        for person in self.people_trajectories:
-            for person_position in self.people_trajectories[person]:
-                plt.plot(person_position[1], person_position[2], 'bo')
+        for person in self._current_tracks:
+            for person_position in self._current_tracks[person]:
+                plt.plot(person_position['x'], person_position['y'], 'bo')
         plt.show()
-
-
-    def predict_people_positions(self, time_delta: float, tracks):
-        self.people_predicted_positions = {}
-        self.people_predicted_positions = self.cliffPredictor.predict_positions(tracks, time_delta)
-        return self.people_predicted_positions
-
-
-    def plot_predicted_positions(self, time: float):
-        self.plot_topological_map()
-        for person_prediction in self.people_predicted_positions:
-            for trajectory in person_prediction:
-                for position in trajectory:
-                    if position[0] - time < 0.8:
-                        in_area = False
-                        for vertex in self.vertices:
-                            if vertex.is_inside_area(position[1], position[2]):
-                                plt.plot(position[1], position[2], 'ro')
-                                in_area = True
-
-                        for edge in self.edges: 
-                            if edge.is_inside_area(position[1], position[2]):
-                                plt.plot(position[1], position[2], 'ro')
-                                in_area = True
-                        if not in_area:
-                            plt.plot(position[1], position[2], 'go')
-        plt.show()
-
-
-    def predict_occupancies_for_edge(self, time: float, edge_id: str):
-        time = math.trunc(time)
-        if time not in self.edge_expected_occupancy:
-            return False
-        if edge_id not in self.edge_expected_occupancy[time]:
-            return False
-        if "poisson_binomial" not in self.edge_expected_occupancy[time][edge_id]:
-            self.calculate_poisson_binomial(time)
-        for level in self.occupancy_levels:
-            self.edge_expected_occupancy[time][edge_id][level] = 0
-        for i in range(0, len(self.edge_expected_occupancy[time][edge_id]['poisson_binomial'])):
-            for level in self.occupancy_levels:
-                if i in range(self.edge_limits[edge_id][level][0], self.edge_limits[edge_id][level][1]):
-                    self.edge_expected_occupancy[time][edge_id][level] += self.edge_expected_occupancy[time][edge_id]['poisson_binomial'][i]
 
 
     def predict_occupancies(self, time_delta: float):
-        self.edge_expected_occupancy = {}
+        self._edge_expected_occupancy = {}
         self.vertex_expected_occupancy = {}
-        tracks = self.get_tracks()
-        self.predict_people_positions(time_delta, tracks)
+        self._predict_people_positions(time_delta)
 
 
-    def plot_tracked_people(self):
-        self.plot_topological_map()
-        for person in self.people_trajectories:
-            for person_position in self.people_trajectories[person]:
-                plt.plot(person_position[1], person_position[2], 'bo')
-        plt.show()
+    # ----- private methods -----
 
 
-    def poisson_binomial(self, probabilities):
+    # used only by predict_occupancies
+    def _predict_people_positions(self, time_delta: float):
+        self.people_predicted_positions = {}
+        self.people_predicted_positions = self.cliffPredictor.predict_positions(self._current_tracks, time_delta)
+        return self.people_predicted_positions
+
+
+    def _predict_occupancies_for_edge(self, time: float, edge_id: str):
+        time = math.trunc(time)
+        if time not in self._edge_expected_occupancy:
+            return False
+        if edge_id not in self._edge_expected_occupancy[time]:
+            return False
+        if "poisson_binomial" not in self._edge_expected_occupancy[time][edge_id]:
+            self._calculate_poisson_binomial(time)
+        for level in self.occupancy_levels:
+            self._edge_expected_occupancy[time][edge_id][level] = 0
+        for i in range(0, len(self._edge_expected_occupancy[time][edge_id]['poisson_binomial'])):
+            for level in self.occupancy_levels:
+                if i in range(self.edge_limits[edge_id][level][0], self.edge_limits[edge_id][level][1]):
+                    self._edge_expected_occupancy[time][edge_id][level] += self._edge_expected_occupancy[time][edge_id]['poisson_binomial'][i]
+
+
+    def _poisson_binomial(self, probabilities):
         # probabilities is a list of probabilities
         if not probabilities:
             return np.array([1.0, 0.0])
@@ -341,54 +284,42 @@ class OccupancyMap(TopologicalMap):
         return np.array(P)
 
 
-    def calculate_poisson_binomial(self, time):
-        for time_probabilities in self.edge_expected_occupancy.keys():
+    def _calculate_poisson_binomial(self, time):
+        for time_probabilities in self._edge_expected_occupancy.keys():
             if time_probabilities == time:
-                for edge in self.edge_expected_occupancy[time]:
-                    probabilities = self.edge_expected_occupancy[time][edge]['probabilities']
-                    poisson_binomial = self.poisson_binomial(probabilities)
-                    self.edge_expected_occupancy[time][edge]['poisson_binomial'] = poisson_binomial
+                for edge in self._edge_expected_occupancy[time]:
+                    probabilities = self._edge_expected_occupancy[time][edge]['probabilities']
+                    poisson_binomial = self._poisson_binomial(probabilities)
+                    self._edge_expected_occupancy[time][edge]['poisson_binomial'] = poisson_binomial
 
 
-    def assign_people_predictions_to_edge(self, time, edge_id):
+    def _assign_people_predictions_to_edge(self, time, edge_id):
         time = math.trunc(time)
         if not self.people_predicted_positions:
             return False
-        if time in self.edge_expected_occupancy:
-            if edge_id in self.edge_expected_occupancy[time]:
-                if "probabilities" in self.edge_expected_occupancy[time][edge_id]:
+        if time in self._edge_expected_occupancy:
+            if edge_id in self._edge_expected_occupancy[time]:
+                if "probabilities" in self._edge_expected_occupancy[time][edge_id]:
                     return True
-        self.edge_expected_occupancy[time] = {}
-        cpu_time_init = datetime.datetime.now()
-        cpu_time_init = datetime.datetime.now()
+        self._edge_expected_occupancy[time] = {}
         for person_predictions in self.people_predicted_positions:
-            self.predict_person_positions(person_predictions, time, edge_id)
-        cpu_time_end = datetime.datetime.now()
-        self.logger.log_time_elapsed("assign_people_to_edge::Time to predict person positions synchronous", (cpu_time_end - cpu_time_init).total_seconds())
+            self._predict_person_positions(person_predictions, time, edge_id)
+        return True
 
 
-    def predict_person_positions(self, person_predictions, time, edge_id):
+    def _predict_person_positions(self, person_predictions, time, edge_id):
         if person_predictions == []:
             return
         weight_of_prediction = 1 /  len(person_predictions)
         person_edge_occupancy = {}
-        cpu_time_init = datetime.datetime.now()
-        # for track in person_predictions:
-        #     self.calculate_track_predictions(track, time, person_edge_occupancy, edge_id, weight_of_prediction)
-        cpu_time_init = datetime.datetime.now()
         for track in person_predictions:
-            self.calculate_track_predictions(track, time, person_edge_occupancy, edge_id, weight_of_prediction)
-        cpu_time_end = datetime.datetime.now()
-        self.logger.log_time_elapsed("predict_person_positions::Time to calculate track predictions synchronous", (cpu_time_end - cpu_time_init).total_seconds())
+            self._calculate_track_predictions(track, time, person_edge_occupancy, edge_id, weight_of_prediction)
 
-        cpu_time_init = datetime.datetime.now()
         for edge in person_edge_occupancy:
-            self.calculate_edge_probabilities(time, person_edge_occupancy, edge)
-        cpu_time_end = datetime.datetime.now()
-        self.logger.log_time_elapsed("predict_person_positions::Time to calculate edge probabilities", (cpu_time_end - cpu_time_init).total_seconds())
+            self._calculate_edge_probabilities(time, person_edge_occupancy, edge)
 
 
-    def calculate_track_predictions(self, track, time, person_edge_occupancy, edge_id, weight_of_prediction):
+    def _calculate_track_predictions(self, track, time, person_edge_occupancy, edge_id, weight_of_prediction):
         track_done = False
         for position in track:
             if abs(position[0] - time) < 1 and not track_done:
@@ -401,16 +332,8 @@ class OccupancyMap(TopologicalMap):
                         track_done = True
 
 
-    def calculate_edge_probabilities(self, time, person_edge_occupancy, edge):
-        if edge not in self.edge_expected_occupancy[time]:
-            self.edge_expected_occupancy[time][edge] = {}
-            self.edge_expected_occupancy[time][edge]['probabilities'] = []
-        self.edge_expected_occupancy[time][edge]['probabilities'].append(person_edge_occupancy[edge])
-
-
-    # remove the occupancy of the vertices and edges
-    def reset_occupancies(self):
-        self.vertex_occupancy = {}
-        self.edge_occupancy = {}
-        self.vertex_expected_occupancy = {}
-        self.edge_expected_occupancy = {}
+    def _calculate_edge_probabilities(self, time, person_edge_occupancy, edge):
+        if edge not in self._edge_expected_occupancy[time]:
+            self._edge_expected_occupancy[time][edge] = {}
+            self._edge_expected_occupancy[time][edge]['probabilities'] = []
+        self._edge_expected_occupancy[time][edge]['probabilities'].append(person_edge_occupancy[edge])

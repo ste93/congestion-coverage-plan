@@ -5,7 +5,7 @@ from rclpy.impl import rcutils_logger
 from ament_index_python.packages import get_package_share_directory
 import os
 
-from src.congestion_coverage_plan_museum.utils import dataset_utils
+from src.congestion_coverage_plan_.utils import dataset_utils
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from static_devices_msgs.msg import DetectionsArray, SingleDetection

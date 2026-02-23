@@ -394,7 +394,7 @@ def get_current_occupancies(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
+        traverse_time =occupancy_map.get_edge_traverse_times(edge_id)
         if edge_id in occupancies.keys():
             for level in occupancy_map.get_occupancy_levels():
                 if occupancies[edge_id] in range(occupancy_map.find_edge_limit(edge_id)[level][0], occupancy_map.find_edge_limit(edge_id)[level][1]):
@@ -420,7 +420,7 @@ def get_medium_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
+        traverse_time =occupancy_map.get_edge_traverse_times(edge_id)
         if edge_id in occupancies.keys():
             for level in occupancy_map.get_occupancy_levels():
                 if occupancies[edge_id] in range(occupancy_map.find_edge_limit(edge_id)[level][0], occupancy_map.find_edge_limit(edge_id)[level][1]):
@@ -437,7 +437,7 @@ def get_high_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
+        traverse_time =occupancy_map.get_edge_traverse_times(edge_id)
         if edge_id in occupancies.keys():
             return math.floor(traverse_time[occupancy_map.get_occupancy_levels()[-1]] * 100)
         else:
