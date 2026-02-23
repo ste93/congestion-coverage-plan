@@ -1,6 +1,7 @@
 FROM ubuntu:24.04
 ENV  DOCKER_BUILDKIT=1
 ARG BRANCH=master
+ARG REPO_USERNAME=convince-project
 
 
 # Install dependencies
@@ -22,13 +23,15 @@ USER root
 RUN mkdir -p /app
 WORKDIR /app
 
-RUN git clone --branch $BRANCH https://github.com/convince-project/congestion-coverage-plan.git
+RUN git clone --branch ${BRANCH} https://github.com/${REPO_USERNAME}/congestion-coverage-plan.git
 
 WORKDIR /app/congestion-coverage-plan
 RUN bash -c "python3 -m venv venv_congestion_coverage_plan && \
-    . venv_congestion_coverage_plan/bin/activate && \
+      && \
     pip install --upgrade pip && \
     pip install -e ."
 # Set the entrypoint to the Python interpreter
+
+
 
 CMD ["bash"]
