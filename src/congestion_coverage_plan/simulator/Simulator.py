@@ -1,3 +1,5 @@
+import math
+
 from matplotlib.pylab import matrix
 from congestion_coverage_plan.mdp.MDP import MDP, State, Transition
 from congestion_coverage_plan.solver.LrtdpTvmaAlgorithm import LrtdpTvmaAlgorithm
@@ -45,6 +47,7 @@ class Simulator:
         calculated_traverse_time, collisions = self.calculate_traverse_time(state, action)
 
         next_time = state.get_time() + calculated_traverse_time
+        next_time = math.trunc(next_time * 100) / 100  # Truncate to two decimal places
         next_vertex = action
         # next_position = (self._occupancy_map.find_vertex_from_id(next_vertex).get_posx(), self._occupancy_map.find_vertex_from_id(next_vertex).get_posy())
         visited_vertices = state.get_visited_vertices().copy()
