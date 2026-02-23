@@ -9,7 +9,12 @@ from congestion_coverage_plan.utils.dataset_utils import *
 import matplotlib.pyplot as plt
 
 
-
+def is_ros_available():
+    try:
+        import rclpy
+        return True
+    except ImportError:
+        return False
 
 class Method(Enum):
     MoD = 1

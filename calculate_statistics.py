@@ -225,15 +225,19 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         for i in levels:
             fig = plt.figure(figsize =(10, 7))
             ax = fig.add_subplot(111)
-            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time per step (level " + str(i) + ")")
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time per step (level " + str(i) + ")", fontsize=20)
             # set y-axis scale to be multiple of 3
             max_y = np.max([np.max(planning_time_lrtdp_per_step_per_level[str(i)][str(x)]) for x in planning_time_lrtdp_per_step_per_level[str(i)].keys()])
             plt.yticks(np.arange(0, max_y + 2, step=20))
             max_steps = len(planning_time_lrtdp_per_step_per_level[str(i)].keys())
             data = [planning_time_lrtdp_per_step_per_level[str(i)][str(x)] for x in range(0, max_steps)]
             ax.boxplot(data, tick_labels = [str(x) for x in range(1, max_steps+1)])
-            plt.ylabel("Planning time per step (s)")
-            plt.xlabel("Step")
+            plt.ylabel("Planning time per step (s)", fontsize=20)
+            plt.xlabel("Step", fontsize=20)
+            # set text size of x and y labels
+
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=12)
             plt.grid()
             plt.show()
 
@@ -242,15 +246,19 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         for i in levels:
             fig = plt.figure(figsize =(10, 7))
             ax = fig.add_subplot(111)
-            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time (level " + str(i) + ") (first planning + max(planning, execution))")
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time (level " + str(i) + ") (first planning + max(planning, execution))", fontsize=20)
             # set only first planning time 
             # data = [execution_time[label][str(i)] for label in labels if label != "steps_lrtdp_pwm"]
             data = [execution_time[label][str(i)] for label in labels]
             # print("data for level", i, data)
             # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
             ax.boxplot(data, tick_labels = labels)
-            plt.ylabel("Execution time (s)")
-            plt.xlabel("Algorithms")
+            plt.ylabel("Execution time (s)", fontsize=20)
+            plt.xlabel("Algorithms", fontsize=20)
+            # set text size of x and y labels 
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=12)
+
             plt.grid()
             plt.show()
 
@@ -260,14 +268,14 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         for i in levels:
             fig = plt.figure(figsize =(10, 7))
             ax = fig.add_subplot(111)
-            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (level " + str(i) + ")")
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (level " + str(i) + ")", fontsize=20)
             data = [cpu_time[label][str(i)] for label in labels]
             print("planning time data for level", i, data)
             # data = [cpu_time["steps_avg"][str(i)], cpu_time["steps_min"][str(i)], cpu_time["steps_max"][str(i)], cpu_time["steps_curr"][str(i)], cpu_time["steps_lrtdp"][str(i)]]
             # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
             ax.boxplot(data, tick_labels = labels)
-            plt.ylabel("Planning time (s)")
-            plt.xlabel("Algorithms")
+            plt.ylabel("Planning time (s)", fontsize=20)
+            plt.xlabel("Algorithms", fontsize=20)
             plt.grid()
             plt.show()
 
