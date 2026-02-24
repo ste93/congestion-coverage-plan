@@ -6,10 +6,52 @@ import congestion_coverage_plan.utils.Plotter as Plotter
 import congestion_coverage_plan.utils.dataset_utils as dataset_utils
 from datetime import datetime
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor
+import os
+
+# Module-level function for parallel processing (must be picklable)
+def _predict_person_worker(args):
+    """Worker function for parallel person prediction."""
+    person_id, traj, cliff_map_data, start_length, observed_tracklet_length, planning_horizon, beta, sample_radius, delta_t, method = args
+    
+    try:
+        # Early filtering: skip if track is too short
+        if len(traj) < observed_tracklet_length:
+            return None
+        
+        # Sort and convert to array
+        traj = sorted(traj, key=lambda x: float(x['timestamp']))
+        human_traj_data_by_person_id = np.array([[pose['timestamp'], pose['x'], pose['y'], pose['velocity'], pose['motion_angle']] for pose in traj])
+        
+        # Create predictor
+        trajectory_predictor = TrajectoryPredictor(
+            cliff_map_origin_data=cliff_map_data,
+            human_traj_origin_data=human_traj_data_by_person_id,
+            person_id=person_id,
+            start_length=start_length,
+            observed_tracklet_length=observed_tracklet_length,
+            max_planning_horizon=planning_horizon,
+            beta=beta,
+            sample_radius=sample_radius,
+            delta_t=delta_t,
+            result_file="out.txt"
+        )
+        
+        if not trajectory_predictor.check_human_traj_data():
+            return None
+        
+        # Run prediction
+        if method == dataset_utils.Method.MoD:
+            return trajectory_predictor.predict_one_human_traj_mod()
+        elif method == dataset_utils.Method.CVM:
+            return trajectory_predictor.predict_one_human_traj_cvm()
+    except Exception as e:
+        print(f"Error predicting person {person_id}: {e}")
+        return None
 
 class CliffPredictor:
 
-    def __init__(self, dataset,  mod_file, observed_tracklet_length, start_length, planning_horizon, beta, sample_radius, delta_t, method, fig_size, ground_truth_data_file = None, map_file = None):
+    def __init__(self, dataset,  mod_file, observed_tracklet_length, start_length, planning_horizon, beta, sample_radius, delta_t, method, fig_size, ground_truth_data_file = None, map_file = None, max_workers=None):
         self.map_file = map_file
         self.mod_file = mod_file
         self.ground_truth_data_file = ground_truth_data_file
@@ -23,6 +65,8 @@ class CliffPredictor:
         self.method = method
         self.dataset = dataset
         self.fig_size = fig_size # [xmin, xmax, ymin, ymax]
+        # Parallelization: use 4 workers by default (or cpu_count - 1)
+        self.max_workers = max_workers if max_workers else min(4, max(1, os.cpu_count() - 1))
         print("Loading cliff map data from file:", mod_file)
         self.cliff_map_data = dataset_utils.read_cliff_map_data(mod_file)
         # print(fig_size)
@@ -88,49 +132,63 @@ class CliffPredictor:
         # print("person_positions", person_positions)
         if planning_horizon:
             self.planning_horizon = planning_horizon
+        
+        t_start = datetime.now()
+        num_people = len(person_positions)
+        
+        # Use sequential processing if too few people (parallelization overhead not worth it)
+        if num_people < 8 or self.max_workers == 1:
+            return self._predict_sequential(person_positions, t_start)
+        
+        # Prepare args for parallel workers
+        worker_args = [
+            (person_id, traj, self.cliff_map_data, self.start_length, 
+             self.observed_tracklet_length, self.planning_horizon, self.beta, 
+             self.sample_radius, self.delta_t, self.method)
+            for person_id, traj in person_positions.items()
+        ]
+        
+        # Parallel prediction using ProcessPoolExecutor
         all_predictions = []
-        # human_traj_data = utils.read_iit_human_traj_data("dataset/iit/iit.csv)
-        for person_id in person_positions.keys():
-            time_for_one_prediction = datetime.now()
-            traj = person_positions[person_id]
-            # print("person_positions", person_positions)
-            # sort the trajectory by time
-            # print("traj", traj)
-            traj = sorted(traj, key=lambda x: float(x['timestamp']))
-            human_traj_data_by_person_id = np.array([[pose['timestamp'], pose['x'], pose['y'], pose['velocity'], pose['motion_angle']] for pose in traj])
-
-            # human_traj_data_by_person_id = self.get_human_traj_data_by_person_id(human_traj_data, person_id)
-
+        num_skipped = 0
+        num_processed = 0
+        
+        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            # Map workers to args
+            results = executor.map(_predict_person_worker, worker_args, chunksize=2)
             
-            # print("human_traj_data_by_person_id", human_traj_data_by_person_id)
-            trajectory_predictor = TrajectoryPredictor(
-                cliff_map_origin_data=self.cliff_map_data,
-                human_traj_origin_data=human_traj_data_by_person_id,
-                person_id=person_id,
-                start_length=self.start_length,
-                observed_tracklet_length=self.observed_tracklet_length,
-                max_planning_horizon=self.planning_horizon,
-                beta=self.beta,
-                sample_radius=self.sample_radius,
-                delta_t=self.delta_t,
-                result_file="out.txt"
-            )
-            # print("trajectory_predictor.check_human_traj_data()", trajectory_predictor.check_human_traj_data())
-            if not trajectory_predictor.check_human_traj_data():
-                # print("trajectory_predictor.check_human_traj_data() failed")
-                continue
-
-            if self.method == dataset_utils.Method.MoD:
-                all_predicted_trajectory_list = trajectory_predictor.predict_one_human_traj_mod()
-            elif self.method == dataset_utils.Method.CVM:
-                try:
-                    all_predicted_trajectory_list = trajectory_predictor.predict_one_human_traj_cvm()
-                except Exception as e:
-                    print("Error occurred while predicting trajectory:", e)
-            all_predictions.append(all_predicted_trajectory_list)
-            # print("time_for_one_prediction", datetime.now() - time_for_one_prediction)
-            # self.display_cliff_map(all_predicted_trajectory_list)
-        # print("Ended prediction")
+            # Collect results
+            for result in results:
+                if result is not None:
+                    all_predictions.append(result)
+                    num_processed += 1
+                else:
+                    num_skipped += 1
+        
+        total_time = (datetime.now() - t_start).total_seconds()
+        print(f"    Predicted {num_processed} people in parallel (workers={self.max_workers}), skipped {num_skipped}, total={total_time:.3f}s")
+        return all_predictions
+    
+    def _predict_sequential(self, person_positions, t_start):
+        """Sequential prediction fallback for small workloads."""
+        all_predictions = []
+        num_skipped = 0
+        num_processed = 0
+        
+        for person_id, traj in person_positions.items():
+            args = (person_id, traj, self.cliff_map_data, self.start_length, 
+                   self.observed_tracklet_length, self.planning_horizon, self.beta, 
+                   self.sample_radius, self.delta_t, self.method)
+            result = _predict_person_worker(args)
+            
+            if result is not None:
+                all_predictions.append(result)
+                num_processed += 1
+            else:
+                num_skipped += 1
+        
+        total_time = (datetime.now() - t_start).total_seconds()
+        print(f"    Predicted {num_processed} people sequentially, skipped {num_skipped}, total={total_time:.3f}s")
         return all_predictions
 
     def evaluate(self, human_traj_data, predicted_traj):

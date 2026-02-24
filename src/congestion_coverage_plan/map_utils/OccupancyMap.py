@@ -48,6 +48,10 @@ class OccupancyMap(TopologicalMap):
         self._current_predictions = None
         self._current_occupancies = None
         self._current_time = None
+        # Caching for predictions
+        self._cached_tracks_hash = None
+        self._cached_predictions = None
+        self._cached_time_delta = None
 
         print("Detections retriever:", detections_retriever)
         if detections_retriever is not None:
@@ -155,65 +159,77 @@ class OccupancyMap(TopologicalMap):
     def compute_current_tracks(self):
         # get detections returns a dictionary of person_id to list of Detection objects, we need to convert it to a dictionary of person_id to numpy array of positions
         self._current_time = self.detections_retriever.get_current_time()
-        # print("---------------- compute_current_tracks, current time:", self._current_time)
         self.human_traj_data = self.detections_retriever.get_detections()
 
-        # print("human_traj_data _to_string:", self.human_traj_data.to_string())
         people_ids = self.human_traj_data.keys()
         tracks = {}
         self._current_tracks = {}
+        
+        # Pre-define datatype once
+        datatype = np.dtype([('timestamp', 'f8'), ('x', 'f8'), ('y', 'f8'), ('velocity', 'f8'), ('motion_angle', 'f8')])
+        min_length = self.cliffPredictor.observed_tracklet_length
+        
         for id in people_ids:
-            # print(f"Person {id} trajectory:")
             human_traj_data_by_person_id = self.human_traj_data[id]
-            # for point in human_traj_data_by_person_id:
-                # print(f"Person {id} point: time={point.timestamp}, x={point.positionx}, y={point.positiony}, velocity={point.velocity}, motion_angle={point.motion_angle}")
-            # convert from list of Detection to numpy array
-            datatype = np.dtype([('timestamp', 'f8'), ('x', 'f8'), ('y', 'f8'), ('velocity', 'f8'), ('motion_angle', 'f8')])
-            # local_trajectory = np.rec.array([])
-            local_trajectory = []
-            for detection in human_traj_data_by_person_id:
-                local_trajectory.append([float(detection.timestamp), float(detection.positionx), float(detection.positiony), float(detection.velocity), float(detection.motion_angle)])
-            # print(f"Person {id} local trajectory (list of lists):", local_trajectory)
-            # print(f"Person {id} human_traj_array (list of lists):", human_traj_array)
-            # Convert to tuples for structured array creation
-            human_traj_struct = np.array([tuple(row) for row in local_trajectory], dtype=datatype)
-            # print(f"Person {id} human_traj_struct (numpy structured array):", human_traj_struct)
-            # # filter the trajectory to be only before the time
-            # print("human_traj_array**:", human_traj_array)
-            # print("human_traj_array**:", human_traj_array[0])
-            # track_before_now = human_traj_array[human_traj_array[:, 0] <= self._current_time]
-            # track_before_now = human_traj_array[human_traj_array[:, 0] <= time]
-            sorted_human_traj_array = human_traj_struct[np.argsort(human_traj_struct['timestamp'])]
-            track_before_now = sorted_human_traj_array[sorted_human_traj_array['timestamp'] <= self._current_time]
-            track_filtered = track_before_now[-(self.cliffPredictor.observed_tracklet_length + 1):]
-            if len(track_filtered) >= self.cliffPredictor.observed_tracklet_length:
+            
+            # Direct numpy array creation without intermediate list
+            human_traj_struct = np.array(
+                [(float(d.timestamp), float(d.positionx), float(d.positiony), 
+                  float(d.velocity), float(d.motion_angle)) 
+                 for d in human_traj_data_by_person_id], 
+                dtype=datatype
+            )
+            
+            if len(human_traj_struct) == 0:
+                continue
+                
+            # Filter and sort in one pass
+            mask = human_traj_struct['timestamp'] <= self._current_time
+            track_before_now = human_traj_struct[mask]
+            
+            if len(track_before_now) == 0:
+                continue
+            
+            # Sort only if needed (check if already sorted)
+            if len(track_before_now) > 1 and not np.all(track_before_now['timestamp'][:-1] <= track_before_now['timestamp'][1:]):
+                track_before_now = track_before_now[np.argsort(track_before_now['timestamp'])]
+            
+            track_filtered = track_before_now[-(min_length + 1):]
+            if len(track_filtered) >= min_length:
                 tracks[id] = track_filtered
-        # print("current tracks @@@@@@@@@@@@@@@:", tracks)
-        # here is wrong!!!
+        
         self._current_tracks = tracks
 
 
     def calculate_current_occupancies(self):
         self._current_occupancies = {}   
         # use only the positions of the people at the current time, so we filter the trajectories to be only at the current time
-        # print(f"DEBUG: _current_tracks has {len(self._current_tracks)} people")
-        # print(f"DEBUG: _current_time = {self._current_time}")
-        # print(f"DEBUG: edges count = {len(self.edges)}")
+        
+        # Pre-allocate edge list for faster iteration
+        edge_ids = list(self.edges.keys())
         
         for person_id, item in self._current_tracks.items():
-            # print(f"DEBUG: Person {person_id} has {len(item)} track points")
-            for position in item:
-                time_diff = abs(position['timestamp'] - self._current_time)
-                # print(f"DEBUG: position timestamp={position['timestamp']}, diff={time_diff:.2f}")
-                if time_diff < 1:
-                    # print(f"DEBUG: Checking position x={position['x']}, y={position['y']}")
-                    for edge_id in self.edges.keys():
-                        edge = self.edges[edge_id]
-                        if edge.is_inside_area(position['x'], position['y']):
-                            # print(f"DEBUG: Position inside edge {edge.get_id()}")
-                            if edge.get_id() not in self._current_occupancies:
-                                self._current_occupancies[edge.get_id()] = 0
-                            self._current_occupancies[edge.get_id()] += 1
+            # Vectorized time difference calculation
+            time_diffs = np.abs(item['timestamp'] - self._current_time)
+            recent_mask = time_diffs < 1
+            
+            if not np.any(recent_mask):
+                continue
+            
+            recent_positions = item[recent_mask]
+            
+            # Check each recent position against edges
+            for position in recent_positions:
+                x, y = position['x'], position['y']
+                # Check all edges for this position
+                for edge_id in edge_ids:
+                    edge = self.edges[edge_id]
+                    if edge.is_inside_area(x, y):
+                        if edge_id not in self._current_occupancies:
+                            self._current_occupancies[edge_id] = 0
+                        self._current_occupancies[edge_id] += 1
+                        break  # Person can only be in one edge at a time
+        
         print("################ current occupancies:", self._current_occupancies)
 
 
@@ -231,9 +247,14 @@ class OccupancyMap(TopologicalMap):
 
 
     def predict_occupancies(self, time_delta: float):
+        import datetime
+        t0 = datetime.datetime.now()
         self._edge_expected_occupancy = {}
         self.vertex_expected_occupancy = {}
+        t1 = datetime.datetime.now()
         self._predict_people_positions(time_delta)
+        t2 = datetime.datetime.now()
+        print(f"  - dict clear: {(t1-t0).total_seconds():.3f}s, predict_positions: {(t2-t1).total_seconds():.3f}s")
 
 
     # ----- private methods -----
@@ -241,9 +262,38 @@ class OccupancyMap(TopologicalMap):
 
     # used only by predict_occupancies
     def _predict_people_positions(self, time_delta: float):
-        self.people_predicted_positions = {}
+        # Generate a hash of current tracks for caching
+        tracks_hash = self._hash_tracks(self._current_tracks)
+        
+        # Return cached predictions if tracks and time_delta haven't changed
+        if (self._cached_tracks_hash == tracks_hash and 
+            self._cached_time_delta == time_delta and 
+            self._cached_predictions is not None):
+            print("  - Using cached predictions")
+            self.people_predicted_positions = self._cached_predictions
+            return self.people_predicted_positions
+        
+        # Compute new predictions
         self.people_predicted_positions = self.cliffPredictor.predict_positions(self._current_tracks, time_delta)
+        
+        # Cache the results
+        self._cached_tracks_hash = tracks_hash
+        self._cached_time_delta = time_delta
+        self._cached_predictions = self.people_predicted_positions
+        
         return self.people_predicted_positions
+    
+    def _hash_tracks(self, tracks):
+        """Generate a hash of tracks for cache comparison."""
+        if not tracks:
+            return None
+        # Create a simple hash based on person IDs and track lengths
+        # This is a lightweight check - if tracks structure changes, hash changes
+        try:
+            return hash((tuple(sorted(tracks.keys())), 
+                        tuple(len(tracks[pid]) for pid in sorted(tracks.keys()))))
+        except:
+            return None
 
 
     def _predict_occupancies_for_edge(self, time: float, edge_id: str):
@@ -301,7 +351,9 @@ class OccupancyMap(TopologicalMap):
             if edge_id in self._edge_expected_occupancy[time]:
                 if "probabilities" in self._edge_expected_occupancy[time][edge_id]:
                     return True
-        self._edge_expected_occupancy[time] = {}
+        # Don't clear the entire time dict - preserve other edges' predictions
+        if time not in self._edge_expected_occupancy:
+            self._edge_expected_occupancy[time] = {}
         for person_predictions in self.people_predicted_positions:
             self._predict_person_positions(person_predictions, time, edge_id)
         return True
@@ -320,16 +372,25 @@ class OccupancyMap(TopologicalMap):
 
 
     def _calculate_track_predictions(self, track, time, person_edge_occupancy, edge_id, weight_of_prediction):
-        track_done = False
-        for position in track:
-            if abs(position[0] - time) < 1 and not track_done:
-                for edge_id_local in self.edges.keys(): 
-                    edge = self.edges[edge_id_local]
-                    if edge.get_id() == edge_id and edge.is_inside_area(position[1], position[2]):
-                        if edge.get_id() not in person_edge_occupancy:
-                            person_edge_occupancy[edge.get_id()] = 0
-                        person_edge_occupancy[edge.get_id()] += weight_of_prediction
-                        track_done = True
+        # Direct edge access instead of iterating through all edges
+        edge = self.edges[edge_id]
+        
+        # Vectorize time check if track is numpy array
+        if len(track) > 0:
+            if isinstance(track, np.ndarray):
+                # Vectorized time filtering
+                time_mask = np.abs(track[:, 0] - time) < 1
+                valid_positions = track[time_mask]
+            else:
+                # List of positions - filter by time
+                valid_positions = [pos for pos in track if abs(pos[0] - time) < 1]
+            
+            # Check if any position is inside the edge area
+            for position in valid_positions:
+                if edge.is_inside_area(position[1], position[2]):
+                    # Use setdefault for cleaner initialization
+                    person_edge_occupancy[edge_id] = person_edge_occupancy.get(edge_id, 0) + weight_of_prediction
+                    return  # Early return once found
 
 
     def _calculate_edge_probabilities(self, time, person_edge_occupancy, edge):

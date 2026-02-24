@@ -70,6 +70,8 @@ class Edge:
         self._end = end
         self.area = self.calculate_area()
         self.area_as_polygon = self.get_area_as_polygon()
+        # Cache bounding box for faster preliminary checks
+        self._bbox = self._compute_bbox()
         
 
     def __eq__(self, other):
@@ -147,10 +149,21 @@ class Edge:
             return None
         return matplotlib.path.Path(self.area)
 
-
-
+    def _compute_bbox(self):
+        """Compute bounding box (min_x, max_x, min_y, max_y) for fast preliminary checks."""
+        if self.area is None:
+            return None
+        xs = [p[0] for p in self.area]
+        ys = [p[1] for p in self.area]
+        return (min(xs), max(xs), min(ys), max(ys))
 
     def is_inside_area(self, x, y):
+        # Fast bounding box check first
+        if self._bbox is not None:
+            min_x, max_x, min_y, max_y = self._bbox
+            if x < min_x or x > max_x or y < min_y or y > max_y:
+                return False
+        # Expensive polygon check only if bounding box passes
         return self.area_as_polygon.contains_point((x, y))
 
 

@@ -80,6 +80,11 @@ class Simulator:
 
 
     def simulate_tsp_generic(self, start_time, initial_state, distance_matrix_function, robot_min_speed=None, robot_max_speed=None):
+        # Compute current occupancies before solving TSP
+        self.set_time_for_occupancies(start_time)
+        self._occupancy_map.compute_current_tracks()
+        self._occupancy_map.calculate_current_occupancies()
+        
         policy = solve_with_google(self._occupancy_map, start_time, initial_state.get_vertex(), distance_matrix_function, time_bound=self._planning_time_bound)
         print("policy", policy)
         return self.simulate_tsp(start_time, initial_state, policy, robot_min_speed, robot_max_speed)

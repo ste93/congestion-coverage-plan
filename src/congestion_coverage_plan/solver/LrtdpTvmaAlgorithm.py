@@ -161,27 +161,37 @@ class LrtdpTvmaAlgorithm():
 
 
     def check_solved(self, state, thetaparameter, initial_greedy_action=None):
+        """Check if state is solved - must explore all reachable states for correctness"""
         solved_condition = True
         open = []
         closed = set()  # Use set for O(1) membership checking
         closed_list = []  # Keep list to maintain states for update phase
         open.append((state, initial_greedy_action))  # Store state with optional precomputed action
+        
         while open != []:
             state_entry = open.pop()
             state = state_entry[0]
             precomputed_greedy = state_entry[1]
-            closed.add(state.to_string())
+            
+            state_str = state.to_string()
+            if state_str in closed:
+                continue
+                
+            closed.add(state_str)
             closed_list.append(state)
+            
             greedy = precomputed_greedy if precomputed_greedy is not None else self.greedy_action(state)
-            if self.residual(state, greedy) > thetaparameter: # or state.get_time() > self.solution_time_bound:
+            if self.residual(state, greedy) > thetaparameter:
                 solved_condition = False
-                # Always expand successors regardless of residual for complete backup
+                # Continue expanding - do NOT break (needed for correctness)
 
             action = greedy[2]
             for transition in self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound):
                 next_state = self.mdp.compute_next_state(state, transition)
-                if next_state.to_string() not in closed and not self.solved(next_state):
+                next_str = next_state.to_string()
+                if next_str not in closed and not self.solved(next_state):
                     open.append((next_state, None))  # No precomputed greedy for next states
+                    
         if solved_condition:
             for state in closed_list:
                 self.solved_set.add(state.to_string())
@@ -225,15 +235,21 @@ class LrtdpTvmaAlgorithm():
     def solve(self):
         number_of_trials = 0
         print("Predicting occupancies from time ", self.time_for_occupancies, " to ", self.time_for_occupancies + 100)
+        initial_current_time_occupancies = datetime.datetime.now()
         self.occupancy_map.compute_current_tracks()
-        self.occupancy_map.predict_occupancies(100)
+        print("Current tracks computed in ", (datetime.datetime.now() - initial_current_time_occupancies).total_seconds(), " seconds")
+        initial_current_time_occupancies = datetime.datetime.now()
+        self.occupancy_map.predict_occupancies(50)
+        print("Occupancies predicted in ", (datetime.datetime.now() - initial_current_time_occupancies).total_seconds(), " seconds")
+        initial_current_time_occupancies = datetime.datetime.now()
         self.occupancy_map.calculate_current_occupancies()
+        print("current Occupancies predicted in ", (datetime.datetime.now() - initial_current_time_occupancies).total_seconds(), " seconds")
         initial_current_time = datetime.datetime.now()
         print("LRTDP TVMA started at: ", initial_current_time, "convergence threshold:", self.convergenceThresholdGlobal, "wait_time:", self._wait_time, "planner time bound:", self.solution_time_bound, "real time bound:", self.planning_time_bound, "initial time for occupancies:", self.time_for_occupancies)
         while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.planning_time_bound):
             self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.solution_time_bound)
             number_of_trials += 1
-            print("trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
+            # print("trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
             if number_of_trials % 50 == 0:
                 print(len(self.policy), "states in policy")
                 print(len(self.valueFunction), "states in value function")
@@ -271,4 +287,5 @@ class LrtdpTvmaAlgorithm():
             while visited:
                 state = visited.pop()
                 greedy = self.calculate_argmin_Q(state)  # Compute for check_solved
-                self.check_solved(state, thetaparameter, greedy)  # Always check all states
+                if not self.check_solved(state, thetaparameter, greedy):
+                    break  # Stop if state is not solved

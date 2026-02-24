@@ -52,8 +52,11 @@ def parse_row(row):
     return time, algorithm, execution_time, collisions, cpu_time_total, execution_time_per_step, cpu_time_per_step, number_of_levels
 
     
-def process_row(row, planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time):
+def process_row(row, planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time, label_algorithm =None):
+
     time, algorithm_local, execution_time_local, collisions_local, cpu_time_total_local, execution_time_per_step_local, cpu_time_per_step_local, number_of_levels_local = parse_row(row)
+    if label_algorithm is not None:
+        algorithm_local = label_algorithm
     if len(cpu_time_per_step_local) != 0:
         for i in range(0, len(cpu_time_per_step_local)):
             if str(i) not in planning_time_lrtdp_per_step_per_level[str(number_of_levels_local)]:
@@ -150,7 +153,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         process_row(data_tsp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
         if csv_file_lrtdp_pwm is not None:
             print("Processing row", row_id, "for lrtdp pwm")
-            process_row(data_lrtdp_pwm[row_id], planning_time_lrtdp_pwm_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
+            process_row(data_lrtdp_pwm[row_id], planning_time_lrtdp_pwm_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time, label_algorithm="steps_lrtdp_pwm")
 
         time_lrtdp = get_time(data_lrtdp[row_id][0])
         time_tsp = get_time(data_tsp[row_id][0])
