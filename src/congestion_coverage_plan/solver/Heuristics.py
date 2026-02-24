@@ -151,7 +151,8 @@ class Heuristics():
         # check if all the states are connected
         
         # print("matrix for mst heuristic:", mst_matrix)
-        cost = np.sum(mst_matrix[mst_matrix != 0])
+        # Only count each edge once (use upper triangle to avoid double-counting in symmetric matrix)
+        cost = np.sum(np.triu(mst_matrix, k=1))
         if cost is not None:
             return cost
         else:
@@ -167,7 +168,12 @@ class Heuristics():
         # check if all the states are connected
         
         # print("matrix for mst heuristic:", mst_matrix)
-        cost = np.sum(mst_matrix[mst_matrix != 0])
+        # Only count each edge once (use upper triangle to avoid double-counting in symmetric matrix)
+        cost = np.sum(np.triu(mst_matrix, k=1))
+        # print("matrix for mst heuristic:")
+        # for line in mst_matrix:
+        #     print(line)
+        # print("state:", state.to_string(), "cost for mst heuristic:", cost)
         if cost is not None:
             return cost
         else:
@@ -192,13 +198,13 @@ class Heuristics():
 
     def heuristic_teleport(self, state):
         value = 0
-        initial_time = datetime.datetime.now()
+        # initial_time = datetime.datetime.now()
         if self._mdp.solved(state):
             return 0
         for vertex_id in (self.occupancy_map.get_vertices().keys() - state.get_visited_vertices()):
             value = value + self.minimum_edge_entering_vertices_dict[vertex_id]
-        end_time = datetime.datetime.now()
-        self.logger.log_time_elapsed("heuristic_teleport::time for calculating heuristic teleport", (end_time - initial_time).total_seconds())
+        # end_time = datetime.datetime.now()
+        # self.logger.log_time_elapsed("heuristic_teleport::time for calculating heuristic teleport", (end_time - initial_time).total_seconds())
         return value
 
 
@@ -223,3 +229,4 @@ class Heuristics():
         # check if all the states are connected
         cost = shortest_path + (remaining_pois_to_explain * self._mdp.get_explain_time()) + penalty
         return cost if cost is not None else 9999999
+

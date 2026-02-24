@@ -1,3 +1,5 @@
+import math
+
 from congestion_coverage_plan.mdp.MDP import MDP, State
 import datetime
 from scipy.sparse import csr_array
@@ -50,8 +52,6 @@ class LrtdpTvmaAlgorithm():
         self.valueFunction = {}
         self.action_costs = {}
         self.solved_set = set()
-        # self.shortest_paths_matrix = self.calculate_shortest_path_matrix()
-        # self.minimum_edge_entering_vertices_dict = self.minimum_edge_entering_vertices()
         heuristics = Heuristics(occupancy_map=self.occupancy_map,
                                 mdp=self.mdp,
                                 heuristic_function=heuristic_function,
@@ -64,6 +64,8 @@ class LrtdpTvmaAlgorithm():
         self.heuristic_function = heuristics.heuristic_function
         self.heuristic_backup = {}
         print("congestion-coverage-plan init with version 2026-02-19")
+
+
     ### HELPERS
     def get_policy(self):
         return self.policy
@@ -83,9 +85,6 @@ class LrtdpTvmaAlgorithm():
 
             if transition.get_probability() == 0:
                 continue
-            # if transition.get_occupancy_level() != "none" and transition.get_occupancy_level() != "zero":
-            #     print("calculate_Q::transition with occupancy level:", transition.to_string())
-            # print("calculate_Q::transition with occupancy level:", transition.to_string())
             local_current_action_cost = 0
             local_current_action_cost = transition.get_cost() * transition.get_probability()
             current_action_cost = current_action_cost + local_current_action_cost
@@ -94,15 +93,7 @@ class LrtdpTvmaAlgorithm():
             local_future_actions_cost = self.get_value(next_state) * transition.get_probability()
             
             future_actions_cost = future_actions_cost + local_future_actions_cost
-        # self.qvalues[state.to_string() + action] = current_action_cost + future_actions_cost
         cost = current_action_cost + future_actions_cost
-        # if cost  <= 0:
-            # print("errorrrrr", cost, state.to_string(), action, current_action_cost, future_actions_cost)
-            # print(len(possible_transitions))
-            # for transition in possible_transitions:
-            #     print(transition.get_cost(), transition.get_probability())
-        # if state.get_time() == 0:
-        #     print("Q value for state:", state.to_string(), "action:", action, "current action cost:", current_action_cost, "future actions cost:", future_actions_cost, "is:", cost)
 
         return cost
 
@@ -113,43 +104,29 @@ class LrtdpTvmaAlgorithm():
                                time=state.get_time(), 
                                visited_vertices=state.get_visited_vertices().copy(), 
                                pois_explained=state.get_pois_explained().copy())
-        time_initial = datetime.datetime.now()
         possible_actions = self.mdp.get_possible_actions(state_internal)
         if not possible_actions:
             print("NO POSSIBLE ACTIONS - dead end reached for state:", state_internal.to_string())
             return (99999999, state_internal, "")
-        time_final = datetime.datetime.now()
-        self.logger.log_time_elapsed("calculate_argmin_Q::time for getting possible actions", (time_final - time_initial).total_seconds())
-
-        # actions_sorted = list(possible_actions)
-        # actions_sorted.sort()
         time_initial = datetime.datetime.now()
         for action in possible_actions:
             qvalues.append((self.calculate_Q(state_internal, action), state_internal, action))
-            # if state.get_time() == 0:
-                # print("Q value for state:", state_internal.to_string(), "action:", action, "is:", qvalues[-1][0])
-        self.logger.log_time_elapsed("calculate_argmin_Q::time for calculating Q values", (time_final - time_initial).total_seconds())
 
-        time_initial = datetime.datetime.now()
         min = None
-        # min = np.min(qvalues, key=lambda x: x[0])  # Find the minimum Q value
         for qvalue in qvalues:
             if min is None:
                 min = qvalue
             else:
                 if qvalue[0] < min[0]:
                     min = qvalue
-        time_final = datetime.datetime.now()
-        self.logger.log_time_elapsed("calculate_argmin_Q::time for finding minimum Q value", (time_final - time_initial).total_seconds())
-        # if min[0] <= 0:
-        #     print("goal")
         return (min[0], min[1], min[2]) # this contains the value, state and action with the minimum Q value
 
 
     ### STATE FUNCTIONS
-    def update(self, state):
-        action = self.greedy_action(state)
-        self.valueFunction[state.to_string()] = action[0]  # this is the value of the state
+    def update(self, state, greedy_action=None):
+        if greedy_action is None:
+            greedy_action = self.greedy_action(state)
+        self.valueFunction[state.to_string()] = greedy_action[0]  # this is the value of the state
         return True
 
 
@@ -157,17 +134,10 @@ class LrtdpTvmaAlgorithm():
         return self.calculate_argmin_Q(state)
 
 
-    def residual(self, state):
-        # print("Residual for state:", state.to_string())
-
-        action = self.greedy_action(state)
-        residual = abs(self.get_value(state) - action[0])
-        # if residual > 0.01:
-        #     print("Residual for state:", state.to_string(), "======", residual, "GOAL?  ", self.goal(state))
-        # if residual < 0.0001:
-        #     print("**************************", action[0], action[1].to_string(), action[2])
-        #     print(state.to_string())
-        #     print()
+    def residual(self, state, greedy_action=None):
+        if greedy_action is None:
+            greedy_action = self.greedy_action(state)
+        residual = abs(self.get_value(state) - greedy_action[0])
         return residual
 
 
@@ -190,30 +160,33 @@ class LrtdpTvmaAlgorithm():
         return is_goal
 
 
-    def check_solved(self, state, thetaparameter):
-        # print("Checking if state is solved: ", state.to_string())
+    def check_solved(self, state, thetaparameter, initial_greedy_action=None):
         solved_condition = True
         open = []
-        closed = []
-        open.append(state)
+        closed = set()  # Use set for O(1) membership checking
+        closed_list = []  # Keep list to maintain states for update phase
+        open.append((state, initial_greedy_action))  # Store state with optional precomputed action
         while open != []:
-            state = open.pop()
-            closed.append(state)
-            if self.residual(state) > thetaparameter: # or state.get_time() > self.solution_time_bound:
+            state_entry = open.pop()
+            state = state_entry[0]
+            precomputed_greedy = state_entry[1]
+            closed.add(state.to_string())
+            closed_list.append(state)
+            greedy = precomputed_greedy if precomputed_greedy is not None else self.greedy_action(state)
+            if self.residual(state, greedy) > thetaparameter: # or state.get_time() > self.solution_time_bound:
                 solved_condition = False
-                continue
+                # Always expand successors regardless of residual for complete backup
 
-            action = self.greedy_action(state)[2] # get the greedy action for the state            
+            action = greedy[2]
             for transition in self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound):
                 next_state = self.mdp.compute_next_state(state, transition)
-                if not (next_state in open or next_state in closed) and not self.solved(next_state): # and not self.goal(state): # and next_state.get_time() <= self.solution_time_bound: # and not self.goal(next_state):
-                    open.append(next_state)
+                if next_state.to_string() not in closed and not self.solved(next_state):
+                    open.append((next_state, None))  # No precomputed greedy for next states
         if solved_condition:
-            for state in closed:
+            for state in closed_list:
                 self.solved_set.add(state.to_string())
         else:
-            while closed:
-                state = closed.pop()
+            for state in closed_list:
                 self.update(state)
         return solved_condition
 
@@ -260,6 +233,7 @@ class LrtdpTvmaAlgorithm():
         while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.planning_time_bound):
             self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.solution_time_bound)
             number_of_trials += 1
+            print("trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
             if number_of_trials % 50 == 0:
                 print(len(self.policy), "states in policy")
                 print(len(self.valueFunction), "states in value function")
@@ -274,13 +248,14 @@ class LrtdpTvmaAlgorithm():
             state = vinitStateParameter
             while not self.solved(state):
                 visited.append(state)
-                self.update(state)
-                self.policy[state.to_string()] = self.calculate_argmin_Q(state)
+                greedy = self.calculate_argmin_Q(state)  # Compute once
+                self.update(state, greedy)  # Pass precomputed greedy action
+                self.policy[state.to_string()] = greedy  # Reuse result
                 if self.goal(state) or (state.get_time() > solution_time_bound):
                     ######## should there be here a bellamn backup?
                     break
                 # perform bellman backup and update policy
-                action = self.policy[state.to_string()][2]
+                action = greedy[2]  # Use cached greedy action
                 # print("state:", state.to_string(), "action:", action)
                 transitions = self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound)
                 if not transitions:
@@ -289,11 +264,11 @@ class LrtdpTvmaAlgorithm():
                 transition_selected = np.random.choice(transitions, p=[t.get_probability() for t in transitions])
                 old_state = state
                 state = self.mdp.compute_next_state(state, transition_selected)
-                self.policy_to_execute[old_state.to_string()] = (self.policy[old_state.to_string()][0], state, action)
+                self.policy_to_execute[old_state.to_string()] = (greedy[0], state, action)
                 
                 # Policy entries are (value, state, action); keep them immutable for callers.
                 
             while visited:
                 state = visited.pop()
-                if not self.check_solved(state, thetaparameter):
-                    break
+                greedy = self.calculate_argmin_Q(state)  # Compute for check_solved
+                self.check_solved(state, thetaparameter, greedy)  # Always check all states

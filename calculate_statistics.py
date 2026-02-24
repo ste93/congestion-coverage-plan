@@ -80,6 +80,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         # next(reader)
         data_lrtdp = [row for row in reader]
     if csv_file_lrtdp_pwm is not None:
+        print("Reading csv file for lrtdp pwm", csv_file_lrtdp_pwm)
         with open(csv_file_lrtdp_pwm, 'r') as file:
             reader = csv.reader(file)
             # next(reader)
@@ -148,6 +149,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         process_row(data_lrtdp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
         process_row(data_tsp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
         if csv_file_lrtdp_pwm is not None:
+            print("Processing row", row_id, "for lrtdp pwm")
             process_row(data_lrtdp_pwm[row_id], planning_time_lrtdp_pwm_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
 
         time_lrtdp = get_time(data_lrtdp[row_id][0])
@@ -180,7 +182,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     # print (collisions["steps_lrtdp"])
     print ("---- DONE READING CSV FILE ----")
     # print("execution time", execution_time)
-
+    print(execution_time)
 
     print ("---- p-values ----")
     for i in levels:
@@ -217,6 +219,7 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     # print("Maximum time delta for tsp:", time_delta_max_tsp)   
     # print("Average time delta for lrtdp:", np.mean(time_delta_better_lrtdp))
     # print("Average time delta for tsp:", np.mean(time_delta_better_tsp))
+    # labels = [key for key in execution_time.keys()]
     plot_planning_time__per_levels = False
     plot_execution_time_per_levels = True
     plot_planning_time_per_levels = True
@@ -362,6 +365,7 @@ if __name__ == '__main__':
                 print("Error: --lrtdp_pwm_file requires a value")
                 sys.exit(1)
             lrtdp_pwm_file = sys.argv[lrtdp_pwm_file_index + 1]
+            print("lrtdp_pwm_file", lrtdp_pwm_file)
         else:
             lrtdp_pwm_file = None
 
