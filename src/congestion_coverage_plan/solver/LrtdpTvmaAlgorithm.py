@@ -82,7 +82,7 @@ class LrtdpTvmaAlgorithm():
 
         possible_transitions = self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound)
         if not possible_transitions:
-            return 99999999
+            return self.solution_time_bound * 2
         # print(f"Possible transitions for state: {state.to_string()}, action: {action}:")
         for transition in possible_transitions:
             # print(f"Transition: {transition}, Probability: {transition.get_probability()}, Cost: {transition.get_cost()}")
@@ -109,7 +109,7 @@ class LrtdpTvmaAlgorithm():
         
         # Time-limited horizon reached - if not at goal, return infinite cost (unsolvable)
         if state.get_time() > self.solution_time_bound:
-            return (99999999, state, None)
+            return (self.solution_time_bound * 2, state, None)
         
         qvalues = []
         state_internal = State(vertex=state.get_vertex(), 
@@ -120,7 +120,7 @@ class LrtdpTvmaAlgorithm():
         # print(f"Calculating argmin Q for state: {state_internal.to_string()}, possible actions: {possible_actions}")
         if not possible_actions:
             print("NO POSSIBLE ACTIONS - dead end reached for state:", state_internal.to_string())
-            return (99999999, state_internal, "")
+            return (self.solution_time_bound * 2, state_internal, "")
         for action in possible_actions:
             q = self.calculate_Q(state_internal, action)
             qvalues.append((q, state_internal, action))
@@ -140,6 +140,9 @@ class LrtdpTvmaAlgorithm():
         if greedy_action is None:
             greedy_action = self.greedy_action(state)
         old_value = self.valueFunction.get(state.to_string(), None)
+        if old_value is not None and (greedy_action[0] - old_value) > 100:
+            print(f"!!! HUGE JUMP at {state.get_vertex()}: {old_value} -> {greedy_action[0]}")
+            print(f"Action taken: {greedy_action[2]}")
         self.valueFunction[state.to_string()] = greedy_action[0]  # this is the value of the state
         self.print_diagnostics(f"update: State={state.to_string()}, OldValue={old_value}, NewValue={greedy_action[0]}, Action={greedy_action[2]}")
         return True
@@ -262,17 +265,20 @@ class LrtdpTvmaAlgorithm():
         while (not self.solved(self.vinitState)) and ((datetime.datetime.now() - initial_current_time)) < datetime.timedelta(seconds = self.planning_time_bound):
             self.lrtdp_tvma_trial(self.vinitState, self.convergenceThresholdGlobal, self.solution_time_bound)
             number_of_trials += 1
-            print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            print("current status after trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
-            print("number of states in solved set:", len(self.solved_set))
-            print("number of states in value function:", len(self.valueFunction))
-            print("number of states in policy:", len(self.policy))
-            print("solved initial state:", self.solved(self.vinitState))
-            if not self.solved(self.vinitState):
-                print("current value of initial state:", self.get_value(self.vinitState))
-                print("residual of initial state:", self.residual(self.vinitState))
-                print("reason for not being solved:")
-            # print("trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
+            # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+            # print("current status after trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
+            # print("number of states in solved set:", len(self.solved_set))
+            # print("number of states in value function:", len(self.valueFunction))
+            # print("number of states in policy:", len(self.policy))
+            # print("solved initial state:", self.solved(self.vinitState))
+            # if not self.solved(self.vinitState):
+            #     v = self.get_value(self.vinitState)
+            #     q, _, _ = self.calculate_argmin_Q(self.vinitState)
+            #     print(f"Initial State Value: {v}, Best Q: {q}, Delta: {abs(v-q)}")
+            #     print("current value of initial state:", self.get_value(self.vinitState))
+            #     print("residual of initial state:", self.residual(self.vinitState))
+            #     print("reason for not being solved:")
+            # # print("trial number:", number_of_trials, "time elapsed:", (datetime.datetime.now() - initial_current_time).total_seconds(), "seconds")
             if number_of_trials % 50 == 0:
                 print(len(self.policy), "states in policy")
                 print(len(self.valueFunction), "states in value function")
@@ -291,10 +297,10 @@ class LrtdpTvmaAlgorithm():
             visited_set.add(state.to_string())
 
             if self.goal(state):
-                print(f"Goal reached at state {state.to_string()}")
+                # print(f"Goal reached at state {state.to_string()}")
                 break
             if state.get_time() > solution_time_bound:
-                print(f"Time bound exceeded at state {state.to_string()}")
+                # print(f"Time bound exceeded at state {state.to_string()}")
                 break
             
             greedy = self.calculate_argmin_Q(state)  # Compute once
@@ -315,10 +321,10 @@ class LrtdpTvmaAlgorithm():
             transition_selected = np.random.choice(transitions, p=[t.get_probability() for t in transitions])
             # print("transition selected:", transition_selected.get_action())
             state = self.mdp.compute_next_state(state, transition_selected)
-        print("Forward pass completed. Starting backward pass to check visited states.")
-        print("solved initial state? ", self.solved(self.vinitState))
-        print("number of visited states in this trial:", len(visited_list))
-        print("visited states:", [s.to_string() for s in visited_list])
+        # print("Forward pass completed. Starting backward pass to check visited states.")
+        # print("solved initial state? ", self.solved(self.vinitState))
+        # print("number of visited states in this trial:", len(visited_list))
+        # print("visited states:", [s.to_string() for s in visited_list])
         # Backward pass: check and update all visited states
         while visited_list:
             state = visited_list.pop()

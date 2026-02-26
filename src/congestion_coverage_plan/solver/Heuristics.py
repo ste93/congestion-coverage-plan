@@ -88,31 +88,32 @@ class Heuristics():
                                                                             initial_vertex_id=state.get_vertex(), 
                                                                             value_for_not_existent_edge=99999999)
         return matrix
+    
 
-    def create_matrix_from_vertices_list_for_mst_local(vertices_ids, occupancy_map, initial_vertex_id, shortest_path_matrix=None, value_for_not_existent_edge=INFINITE_DISTANCE):
+    def create_matrix_from_vertices_list_for_mst_local(self, vertices_ids, occupancy_map, initial_vertex_id, shortest_path_matrix=None, value_for_not_existent_edge=INFINITE_DISTANCE):
         matrix = []
         for row_id in range(0, len(vertices_ids)):
             row = []
-            vertex_row_id = vertices_ids[row_id]
-            for column_id in range(0, len(vertices_ids)):
-                vertex_column_id = vertices_ids[column_id]
-                # print(row_id, column_id)
-                if row_id == column_id:
+            v_row = vertices_ids[row_id]
+            for col_id in range(0, len(vertices_ids)):
+                v_col = vertices_ids[col_id]
+                if row_id == col_id:
                     row.append(0)
                 else:
-                    # print("finding edge from", vertex_row_id, vertex_column_id)
                     edge_length = None
                     if shortest_path_matrix is not None:
-                        edge_length = shortest_path_matrix[int(vertex_row_id[6:]) - 1][int(vertex_column_id[6:]) - 1]
+                        # USE RAW FLOAT HERE - Do not floor!
+                        edge_length = shortest_path_matrix[int(v_row[6:]) - 1][int(v_col[6:]) - 1]
                     else:
-                        edge = occupancy_map.find_edge_from_position(vertex_row_id, vertex_column_id)
+                        edge = occupancy_map.find_edge_from_position(v_row, v_col)
                         if edge is not None:
                             edge_length = edge.get_length()
 
                     if edge_length is None:
                         row.append(value_for_not_existent_edge)
                     else:
-                        row.append(math.floor(edge_length))
+                        # Remove math.floor to maintain consistency with MDP costs
+                        row.append(float(edge_length)) 
             matrix.append(row)
         return matrix
 
