@@ -143,7 +143,7 @@ class MDP:
         # cpu_time = (cpu_time_end - cpu_time_init).total_seconds()
         # print("compute_transition::CPU time for calculate_transition_probability: ", cpu_time)
         # print ("transition_probability", transition_probability)
-        if transition_probability < 0.000001:
+        if transition_probability < 0.01:
             return
         # cpu_time_init = datetime.datetime.now()
         transition_cost = self.calculate_transition_cost(edge,self.time_for_occupancies + state.get_time() - self.time_start , occupancy_level)
@@ -239,7 +239,18 @@ class MDP:
                                               visited_vertices=state.get_visited_vertices(), 
                                               pois_explained=state.get_pois_explained()), 
                                         item[0], item[1], transitions)
+            self.renormalize_transitions(transitions)
             return transitions
+
+
+    def renormalize_transitions(self, transitions):
+        # renormalize the probabilities of the transitions
+        total_probability = sum([transition.get_probability() for transition in transitions])
+        if total_probability == 0:
+            return transitions
+        for transition in transitions:
+            transition._probability = transition.get_probability() / total_probability
+        return transitions
 
 
     def get_possible_actions_museum(self, state):
@@ -307,7 +318,8 @@ class MDP:
 
 
     def solved_coverage(self, state):
-        difference = len(self.occupancy_map.get_vertices().keys()) - len(state.get_visited_vertices())
+        all_vertices_visited = state.get_visited_vertices().union(set([state.get_vertex()]))
+        difference = len(self.occupancy_map.get_vertices().keys()) - len(all_vertices_visited)
         solved = difference == 0
         # print("Checking if solved, state:", state.to_string(), "difference:", difference, "solved:", solved)
 
