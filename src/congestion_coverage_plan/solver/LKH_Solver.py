@@ -4,7 +4,7 @@ import tempfile
 import re
 
 def solve_hamiltonian_path_with_lkh(matrix, vertices_ids, time_limit_seconds=5):
-    lkh_path = "/home/sbernagozzi-iit.local/tmp/LKH-3.0.6/LKH"
+    lkh_path = "/usr/local/bin/lkh"
     dim = len(matrix)
     
     # Valore di sicurezza: abbastanza grande da essere evitato, 
@@ -121,7 +121,7 @@ def test():
     print(matrix[1][9])
     vertices_ids = ["fake", 'vertex1', 'vertex10', 'vertex11', 'vertex12', 'vertex13', 'vertex14', 'vertex15', 'vertex16', 'vertex17', 'vertex18', 'vertex19', 'vertex2', 'vertex20', 'vertex21', 'vertex22', 'vertex23', 'vertex24', 'vertex25', 'vertex26', 'vertex3', 'vertex4', 'vertex5', 'vertex6', 'vertex7', 'vertex8', 'vertex9']
     initial_vertex_id = "fake"
-    path, cost = solve_madama_26_with_lkh(matrix, vertices_ids,10 )
+    path, cost = solve_hamiltonian_path_with_lkh(matrix, vertices_ids,10 )
     print("Percorso trovato:", path)
     print("Costo del percorso:", cost)
 
