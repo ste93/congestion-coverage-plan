@@ -10,6 +10,7 @@ from tqdm import *
 from datetime import datetime
 from time import sleep
 import congestion_coverage_plan.hamiltonian_path.hamiltonian_path as hamiltonian_path
+from congestion_coverage_plan.solver.LKH_Solver import solve_hamiltonian_path_with_lkh
 from congestion_coverage_plan.hamiltonian_path.hamiltonian_path import create_data_model_from_matrix, solve_with_google, create_matrix_from_occupancy_map_length, create_matrix_from_occupancy_map_medium_occupancy, create_matrix_from_occupancy_map_current_occupancy, create_matrix_from_occupancy_map_high_occupancy, solve_with_google_with_data, compute_solution_cost
 class Simulator:
 
@@ -153,26 +154,39 @@ class Simulator:
                 initial_vertex_id=state.get_vertex(),
                 length_function=None
             )
+            vertices_list = ["fake"] + vertices_list 
             print("map_current_occupancy")
             for row in map_current_occupancy:
                 print(row)
-            data = create_data_model_from_matrix(map_current_occupancy)
-            policy = hamiltonian_path.solve_with_google_with_data_returning_policy(data=data, vertex_list=vertices_list, time_bound=self._planning_time_bound)
+            # data = create_data_model_from_matrix(map_current_occupancy)
+            policy, cost = solve_hamiltonian_path_with_lkh(map_current_occupancy, vertices_list, time_limit_seconds=self._planning_time_bound)
+            # policy = hamiltonian_path.solve_with_google_with_data_returning_policy(data=data, vertex_list=vertices_list, time_bound=self._planning_time_bound)
             print("policy cost", compute_solution_cost(policy, self._occupancy_map))
 
             print("policy", policy)
-            if policy is None:
-                print("exit because no policy found")
-                print(state.get_visited_vertices())
-                print(state.get_vertex())
-                executed_steps.append(("FAILURE", 0))
-                return (state.get_time(), executed_steps, steps_time)
+# ... dopo aver ottenuto la policy ...
+            
+            if policy is None or len(policy) < 2:
+                print("ERRORE: Policy non valida o troppo corta")
+                # gestione failure...
             else:
-                print("found policy", policy)
-                state, collisions, traverse_time = self.execute_step(state, policy[0])
-                executed_steps.append((policy[0], collisions))
-                steps_time.append(float(traverse_time))
-
+                # Trova la posizione attuale del robot nella policy
+                try:
+                    current_idx = policy.index(state.get_vertex())
+                    # Prendi il prossimo nodo se esiste
+                    if current_idx + 1 < len(policy):
+                        target_vertex = policy[current_idx + 1]
+                        print(f"Eseguo step: {state.get_vertex()} -> {target_vertex}")
+                        
+                        state, collisions, traverse_time = self.execute_step(state, target_vertex)
+                        executed_steps.append((target_vertex, collisions))
+                        steps_time.append(float(traverse_time))
+                    else:
+                        print("Fine del percorso raggiunto")
+                        completed = True
+                except ValueError:
+                    print(f"ERRORE: Il vertice attuale {state.get_vertex()} non è nella policy!")
+                    # Questo succede se LKH non include il nodo di partenza (errore nella matrice)s
 
 
                 

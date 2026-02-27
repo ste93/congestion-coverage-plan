@@ -7,7 +7,7 @@ import math
 import datetime
 import numpy as np
 
-INFINITE_DISTANCE = 9999999999999999
+INFINITE_DISTANCE = 999999
 
 
 def apply_infeasible_arcs(routing, manager, distance_matrix, blocked_value=INFINITE_DISTANCE):
