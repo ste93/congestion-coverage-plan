@@ -190,62 +190,23 @@ class LrtdpTvmaAlgorithm():
 
 
     def check_solved(self, state, thetaparameter, initial_greedy_action=None):
-        """Check if state is solved - must explore all reachable states for correctness"""
-        solved_condition = True
-        open_list = []
-        closed_set = set()  # Use set for O(1) membership checking
-        closed_list = []  # Keep list to maintain states for update phase
-        open_set = set()  # Track states in open to avoid duplicates
+        """Check if state is solved based on residual threshold - O(1) operation"""
+        # For terminal states (goal or time-exceeded non-goal), mark as solved
+        if self.goal(state):
+            self.solved_set.add(state.to_string())
+            return True
         
-        open_list.append((state, initial_greedy_action))  # Store state with optional precomputed action
-        open_set.add(state.to_string())
+        # For non-terminal states, check residual
+        residual_val = self.residual(state)
         
-        while open_list != []:
-            state_entry = open_list.pop()
-            open_set.discard(state_entry[0].to_string())  # Remove from open tracking set
-            state = state_entry[0]
-            precomputed_greedy = state_entry[1]
-            
-            state_str = state.to_string()            
-            closed_set.add(state_str)
-            closed_list.append(state)
-            
-            residual_val = self.residual(state, None)
-            
-            # Never mark time-exceeded non-goal states as solved (they're infeasible)
-            # if state.get_time() > self.solution_time_bound and not self.goal(state):
-            #     solved_condition = False
-            if residual_val > thetaparameter:
-                solved_condition = False
-                continue  # No need to expand further if residual is too high
-                # Continue expanding - do NOT break (needed for correctness)
-            greedy =  self.greedy_action(state)
-
-            action = greedy[2]
-            # Skip expansion for terminal states (goal or time-bounded states with action=None)
-            # if action is None or self.goal(state) or state.get_time() > self.solution_time_bound:
-            #     continue
-                
-            for transition in self.mdp.get_possible_transitions_from_action(state, action, self.solution_time_bound):
-                if transition.get_probability() > 0:
-                    
-                    next_state = self.mdp.compute_next_state(state, transition)
-                    next_str = next_state.to_string()
-                    # Only add if not solved, not in closed, and not already in open (matching pseudocode line 16)
-                    if next_str not in closed_set and next_str not in open_set and not self.solved(next_state):
-                        open_list.append((next_state, None))  # No precomputed greedy for next states
-                        open_set.add(next_str)
-        # print("check_solved: State=", state.to_string(), "SolvedCondition=", solved_condition, "VisitedStates=", len(closed_list))
-        if solved_condition:
-            for state in closed_list:
-                self.solved_set.add(state.to_string())
+        if residual_val <= thetaparameter:
+            # State is solved: add to solved set
+            self.solved_set.add(state.to_string())
+            return True
         else:
-            while closed_list:
-                state = closed_list.pop()
-                self.solved_set.discard(state.to_string())  # Remove from solved set if it was added
-
-        
-        return solved_condition
+            # State is not solved: remove from solved set if present
+            self.solved_set.discard(state.to_string())
+            return False
 
 
     def solve(self):
@@ -329,11 +290,6 @@ class LrtdpTvmaAlgorithm():
         while visited_list:
             state = visited_list.pop()
             visited_set.discard(state.to_string())
-            # Pass the precomputed greedy action from forward pass for consistency
-            # precomputed_greedy = self.policy.get(state.to_string())
-
-            # # First unsolved state found - print diagnostic
-            # greedy = precomputed_greedy if precomputed_greedy else self.calculate_argmin_Q(state)
-            if not self.check_solved(state, thetaparameter, None):
-                break
+            # Check if this state is solved - continue through all states (don't break early)
+            self.check_solved(state, thetaparameter, None)
 
