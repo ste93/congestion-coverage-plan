@@ -2,6 +2,7 @@ import csv
 import matplotlib.pyplot as plt
 import sys 
 import numpy as np
+import itertools
 from datetime import datetime
 from scipy.stats import mannwhitneyu
 
@@ -19,7 +20,7 @@ def get_time(row):
     # row = float(row)
 
     # return eval(row)
-labels = ["steps_lrtdp", "steps_lrtdp_pwm", "steps_tsp_current_occupancy_with_replanning"]
+labels = ["steps_lrtdp", "steps_lrtdp_pwm", "steps_tsp"]
 levels = [2,5,8]
 
 
@@ -57,6 +58,12 @@ def process_row(row, planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_
     time, algorithm_local, execution_time_local, collisions_local, cpu_time_total_local, execution_time_per_step_local, cpu_time_per_step_local, number_of_levels_local = parse_row(row)
     if label_algorithm is not None:
         algorithm_local = label_algorithm
+    # print("time", time, "algorithm", algorithm_local, "execution_time", execution_time_local, "collisions", collisions_local, "cpu_time_total", cpu_time_total_local, "execution_time_per_step", execution_time_per_step_local, "cpu_time_per_step", cpu_time_per_step_local, "number_of_levels", number_of_levels_local)
+    # reset data
+
+    if str(number_of_levels_local) not in planning_time_lrtdp_per_step_per_level:
+        planning_time_lrtdp_per_step_per_level[str(number_of_levels_local)] = {}
+    
     if len(cpu_time_per_step_local) != 0:
         for i in range(0, len(cpu_time_per_step_local)):
             if str(i) not in planning_time_lrtdp_per_step_per_level[str(number_of_levels_local)]:
@@ -149,8 +156,8 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
         ## PROCESS LRTDP RESULTS
 
 
-        process_row(data_lrtdp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
-        process_row(data_tsp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time)
+        process_row(data_lrtdp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time, label_algorithm="steps_lrtdp")
+        process_row(data_tsp[row_id], planning_time_lrtdp_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time, label_algorithm="steps_tsp")
         if csv_file_lrtdp_pwm is not None:
             print("Processing row", row_id, "for lrtdp pwm")
             process_row(data_lrtdp_pwm[row_id], planning_time_lrtdp_pwm_per_step_per_level, cpu_time, cpu_time_first_planning, collisions, execution_time, label_algorithm="steps_lrtdp_pwm")
@@ -190,23 +197,23 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     print ("---- p-values ----")
     for i in levels:
 
-        p = mannwhitneyu( execution_time["steps_lrtdp"][str(i)], execution_time["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')
+        p = mannwhitneyu( execution_time["steps_lrtdp"][str(i)], execution_time["steps_tsp"][str(i)], alternative='less')
         print("p-value lrtdp tsp level", i, p[1])
         if csv_file_lrtdp_pwm is not None:
-            p = mannwhitneyu( execution_time["steps_lrtdp_pwm"][str(i)], execution_time["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')
+            p = mannwhitneyu( execution_time["steps_lrtdp_pwm"][str(i)], execution_time["steps_tsp"][str(i)], alternative='less')
             print("p-value lrtdp pwm tsp level", i, p[1])
-        p = mannwhitneyu( collisions["steps_lrtdp"][str(i)], collisions["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')
+        p = mannwhitneyu( collisions["steps_lrtdp"][str(i)], collisions["steps_tsp"][str(i)], alternative='less')
         print("p-value collisions lrtdp tsp level", i, p[1])
         if csv_file_lrtdp_pwm is not None:
-             p = mannwhitneyu( collisions["steps_lrtdp_pwm"][str(i)], collisions["steps_tsp_current_occupancy_with_replanning"][str(i)], alternative='less')
+             p = mannwhitneyu( collisions["steps_lrtdp_pwm"][str(i)], collisions["steps_tsp"][str(i)], alternative='less')
              print("p-value collisions lrtdp pwm tsp level", i, p[1])
     
     print("----- DONE CALCULATING p-values ----")
     for i in levels:
 
-        print("Average execution time for tsp level", i, np.mean(execution_time["steps_tsp_current_occupancy_with_replanning"][str(i)]))
+        print("Average execution time for tsp level", i, np.mean(execution_time["steps_tsp"][str(i)]))
         print("Average execution time for lrtdp level", i, np.mean(execution_time["steps_lrtdp"][str(i)]))
-        print("Average number of collisions for tsp level", i, np.mean(collisions["steps_tsp_current_occupancy_with_replanning"][str(i)]))
+        print("Average number of collisions for tsp level", i, np.mean(collisions["steps_tsp"][str(i)]))
         print("Average number of collisions for lrtdp level", i, np.mean(collisions["steps_lrtdp"][str(i)]))
 
 
@@ -223,11 +230,14 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
     # print("Average time delta for lrtdp:", np.mean(time_delta_better_lrtdp))
     # print("Average time delta for tsp:", np.mean(time_delta_better_tsp))
     # labels = [key for key in execution_time.keys()]
-    plot_planning_time__per_levels = False
-    plot_execution_time_per_levels = True
-    plot_planning_time_per_levels = True
+    plot_planning_time_per_step_per_levels = False
+    plot_execution_time_per_levels = False
+    plot_planning_time_per_levels = False
+    plot_planning_time_per_levels_only_first_planning = False
     plot_collisions_per_levels = False
-    if plot_planning_time__per_levels:
+    plot_execution_time_per_levels_comparison = False
+    plot_all_execution_time_per_levels_comparison = True
+    if plot_planning_time_per_step_per_levels:
         for i in levels:
             fig = plt.figure(figsize =(10, 7))
             ax = fig.add_subplot(111)
@@ -271,17 +281,47 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
 
     # plot the planning time for the execution of the lrtdp and tsp algorithms for each level
     if plot_planning_time_per_levels:
-        for i in levels:
+        algorithms_to_compare = ["steps_lrtdp", "steps_tsp", "steps_lrtdp_pwm"] if csv_file_lrtdp_pwm is not None else ["steps_lrtdp", "steps_tsp"]
+        for alg in algorithms_to_compare:
             fig = plt.figure(figsize =(10, 7))
             ax = fig.add_subplot(111)
-            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (level " + str(i) + ")", fontsize=20)
-            data = [cpu_time[label][str(i)] for label in labels]
-            print("planning time data for level", i, data)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " planning time (algorithm " + alg + ")", fontsize=20)
+            data = [cpu_time[alg][str(i)] for i in levels]
+            print("planning time data for algorithm", alg, data)
             # data = [cpu_time["steps_avg"][str(i)], cpu_time["steps_min"][str(i)], cpu_time["steps_max"][str(i)], cpu_time["steps_curr"][str(i)], cpu_time["steps_lrtdp"][str(i)]]
             # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
-            ax.boxplot(data, tick_labels = labels)
+            ax.boxplot(data, tick_labels = levels)
             plt.ylabel("Planning time (s)", fontsize=20)
-            plt.xlabel("Algorithms", fontsize=20)
+            plt.xlabel("Levels", fontsize=20)
+            plt.grid()
+            plt.show()
+    
+    if plot_planning_time_per_levels_only_first_planning:
+        fontsize = 35
+        algorithms_to_compare = ["steps_lrtdp", "steps_tsp", "steps_lrtdp_pwm"] if csv_file_lrtdp_pwm is not None else ["steps_lrtdp", 
+        "steps_tsp"]
+        algorithm_name = ["LRTDP", "hamiltonian path", "LRTDP bounded"] if csv_file_lrtdp_pwm is not None else ["LRTDP", "hamiltonian path"]
+        for alg, name in zip(algorithms_to_compare, algorithm_name):
+            fig = plt.figure(figsize =(2, 5))
+            ax = fig.add_subplot(111)
+            if "madama" in csv_file_tsp:
+                ax.set_title("Largest museum map planning time\nonly first planning\n(" + name + ")", fontsize=fontsize)      
+            elif "atc" in csv_file_tsp:
+                ax.set_title("Largest ATC map planning time\nonly first planning\n(" + name + ")", fontsize=fontsize)          
+            data = [cpu_time_first_planning[alg][str(i)] for i in levels]
+            print("planning time only first planning data for algorithm", alg, data)
+            # data = [cpu_time["steps_avg"][str(i)], cpu_time["steps_min"][str(i)], cpu_time["steps_max"][str(i)], cpu_time["steps_curr"][str(i)], cpu_time["steps_lrtdp"][str(i)]]
+            # labels = ["tsp_avg", "tsp_min", "tsp_max", "tsp_curr", "lrtdp"]
+            bplot = ax.boxplot(data, tick_labels = levels, patch_artist=True)
+            # set colors
+            colors = ['khaki', 'plum', 'sandybrown'] if csv_file_lrtdp_pwm is not None else ['lightyellow', 'lightviolet']
+            for patch, color in zip(bplot['boxes'], colors):
+                patch.set_facecolor(color)
+            plt.ylabel("Planning time (s)", fontsize=fontsize)
+            plt.xlabel("Congestion bands", fontsize=fontsize)
+            plt.xticks(fontsize=fontsize)
+            plt.yticks(fontsize=fontsize)
+            plt.subplots_adjust(left=0.25, right=0.6, top=0.85, bottom=0.2)
             plt.grid()
             plt.show()
 
@@ -293,18 +333,95 @@ def get_statistics(csv_file_tsp, csv_file_lrtdp, max_levels = 8, csv_file_lrtdp_
             ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " number of collisions (level " + str(i) + ")")
             data = [collisions[label][str(i)] for label in labels]
             ax.boxplot(data, tick_labels = labels)
+            print("collisions data for level", i, data)
             plt.ylabel("Number of collisions")
             plt.xlabel("Algorithms")
             plt.grid()
             plt.show()
 
+    if plot_execution_time_per_levels_comparison:
+        algorithms_to_compare = ["steps_lrtdp", "steps_tsp", "steps_lrtdp_pwm"] if csv_file_lrtdp_pwm is not None else ["steps_lrtdp", "steps_tsp"]
+        for alg in algorithms_to_compare:
+            fig = plt.figure(figsize =(10, 7))
+            ax = fig.add_subplot(111)
+            ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time comparison (level " + str(i) + ")")
+            data = [execution_time[alg][str(i)] for i in levels]
+            print(data)
+            ax.boxplot(data, tick_labels = levels)
+            plt.ylabel("Execution time (s)")
+            plt.xlabel("levels")
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.grid()
+            plt.show()
+
+
+    if plot_all_execution_time_per_levels_comparison:
+        algorithms_to_compare = ["steps_lrtdp", "steps_lrtdp_pwm", "steps_tsp"] if csv_file_lrtdp_pwm is not None else ["steps_lrtdp", "steps_tsp"]
+
+        fig = plt.figure(figsize =(10, 7))
+        ax = fig.add_subplot(111)
+        fontsize = 30
+        # ax.set_title(csv_file_tsp.split("/")[-1].split(".")[0] + " execution time comparison (all levels)")
+        ax.set_title("largest ATC map execution time comparison (all bands)", fontsize=fontsize)
+        if "atc" in csv_file_tsp:
+            ax.set_title("Largest ATC map execution time comparison (all bands)", fontsize=fontsize)
+        elif "madama" in csv_file_tsp:
+            ax.set_title("Largest museum map execution time comparison (all bands)", fontsize=fontsize)
+        print(list(itertools.product(levels, algorithms_to_compare)))
+        data = [execution_time[alg][str(i)] for i, alg  in itertools.product(levels, algorithms_to_compare)]
+        print(data)
+        algorithms_to_compare = ["LRTDP", "LRTDP\nbounded", "hamiltonian\npath"] if csv_file_lrtdp_pwm is not None else ["LRTDP", "hamiltonian\npath"]
+        labels_local = [str(alg) + "\n(" + str(i) + ")" for i, alg in itertools.product(levels, algorithms_to_compare)]
+        bplot = ax.boxplot(data, tick_labels = labels_local, 
+                   patch_artist=True, notch=True)
+        colors = ['lightblue', 'lightgreen', 'white', 'lightblue', 'lightgreen', 'white', 'lightblue', 'lightgreen', 'white'] if csv_file_lrtdp_pwm is not None else ['lightblue', 'lightgreen', 'lightblue', 'lightgreen', 'lightblue', 'lightgreen']
+        # colors = ['lightblue', 'lightgreen', 'white', 'lightblue', 'lightgreen', 'white', 'lightblue', 'lightgreen', 'white']
+        line_colors = ['blue', 'green', 'black', 'blue', 'green', 'black', 'blue', 'green', 'black'] if csv_file_lrtdp_pwm is not None else ['blue', 'green',   'blue', 'green', 'blue', 'green']
+        for patch, color, line_color in zip(bplot['boxes'], colors, line_colors):
+            patch.set_facecolor(color)
+            patch.set_edgecolor(line_color)
+            patch.set_linewidth(2)
+        # Change whisker and cap colors
+        wcolors = ['blue', 'blue', 'green', 'green', 'black', 'black', 'blue', 'blue', 'green', 'green', 'black', 'black',  'blue', 'blue', 'green', 'green', 'black', 'black', ] if csv_file_lrtdp_pwm is not None else ['blue', 'blue', 'green', 'green', 'blue', 'blue', 'green', 'green']
+        print(len(bplot['whiskers']), len(bplot['caps']), len(line_colors))
+        print("bplot whiskers", bplot['whiskers'])
+        print("bplot caps", bplot['caps'])
+        print(list(zip(bplot['whiskers'], line_colors)))
+        print(list(zip(bplot['caps'], line_colors)))
+        for whisker, wcolor in zip(bplot['whiskers'], wcolors):
+            whisker.set(color=wcolor, linewidth=1.5)
+        for cap, ccolor in zip(bplot['caps'], wcolors):
+            cap.set(color=ccolor, linewidth=1.5)
+        # set colors also for outliers
+        for flier, outlier_color in zip(bplot['fliers'], line_colors):
+            flier.set(marker='o', markerfacecolor=outlier_color, markeredgecolor=outlier_color, alpha=0.7, markersize=8)
+        # for whisker in bplot['whiskers']:
+        #     whisker.set(color='black', linewidth=1.5)
+        # for cap in bplot['caps']:
+        #     cap.set(color='black', linewidth=1.5)
+        # Change median line color
+        for median in bplot['medians']:
+            median.set(color='red', linewidth=2)
+        plt.ylabel("Execution time (s)", fontsize=fontsize)
+        plt.xlabel("Algorithm (number of congestion bands)", fontsize=fontsize)
+        plt.xticks(fontsize=fontsize)
+        plt.yticks(fontsize=fontsize)
+        plt.grid()
+        plt.tight_layout()
+        plt.show()
+
+
+
+
+    print("---- DONE PLOTTING ----")
 
 
 def plot_cpu_times_per_number_of_vertices(csv_file_tsp):
     cpu_times_per_level = {}
     for j in [11, 16, 21]:
         cpu_times_per_level[str(j)] = []
-        with open(csv_file_tsp.split(".")[0] + "_" + str(j) + "_lrtdp.csv", 'r') as file:
+        with open(csv_file_tsp, 'r') as file:
             reader = csv.reader(file)
             next(reader)
             data = [row for row in reader]
@@ -388,6 +505,8 @@ if __name__ == '__main__':
                 print("Error: --max_levels requires a value")
                 sys.exit(1)
             max_levels = int(sys.argv[max_levels_index + 1])
+        
+
         else:
             print_usage()
             sys.exit(1)
