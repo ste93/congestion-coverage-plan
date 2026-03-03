@@ -24,14 +24,16 @@ class LrtdpTvmaAlgorithm():
                  heuristic_function, 
                  initial_state=None, 
                  logger=None,
-                 explain_time=20):
+                 explain_time=20, 
+                 is_museum_experiment=False):
         self.occupancy_map = occupancy_map
         self.print_diagnostics_bool = False  # Set to True to enable detailed diagnostics
         self.mdp = MDP(occupancy_map=occupancy_map, 
                        time_for_occupancies=time_for_occupancies, 
                        time_start=time_start, 
                        wait_time=wait_time, 
-                       explain_time=explain_time)
+                       explain_time=explain_time,
+                       is_museum_experiment=is_museum_experiment)
         self._wait_time = wait_time
         self.initial_time = time_for_occupancies
         self.time_for_occupancies = time_for_occupancies
@@ -55,7 +57,8 @@ class LrtdpTvmaAlgorithm():
         heuristics = Heuristics(occupancy_map=self.occupancy_map,
                                 mdp=self.mdp,
                                 heuristic_function=heuristic_function,
-                                logger=logger)
+                                logger=logger, 
+                                is_museum_experiment=is_museum_experiment)
         if logger is not None:
             self.logger = logger
         else:

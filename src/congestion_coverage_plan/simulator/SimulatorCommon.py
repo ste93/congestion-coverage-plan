@@ -21,7 +21,8 @@ def simulate_generic(filename,
                      wait_time, 
                      heuristic_function,
                      explain_time, 
-                     output_folder = None):
+                     output_folder = None, 
+                     is_museum_experiment=False):
     print("arguments:")
     print("filename:", filename)
     print("time_list:", time_list)
@@ -36,6 +37,11 @@ def simulate_generic(filename,
     print("wait_time:", wait_time)
     print("heuristic_function:", heuristic_function)
     print("explain_time:", explain_time)
+    if output_folder is not None:
+        print("output_folder:", output_folder)
+    if is_museum_experiment:
+        print("is_museum_experiment:", is_museum_experiment)
+
     base_folder = "results"
     warnings.filterwarnings("ignore")
     if output_folder is not None:
@@ -122,7 +128,8 @@ def simulate_generic(filename,
                                    file=file_lrtdp, 
                                    logger=logger, 
                                    convergence_threshold=convergence_threshold,
-                                   heuristic_function=heuristic_function)
+                                   heuristic_function=heuristic_function, 
+                                   is_museum_experiment=is_museum_experiment)
                     
 
             if run_lrtdp_pwm_bool:

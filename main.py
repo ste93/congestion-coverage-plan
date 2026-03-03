@@ -31,7 +31,8 @@ def create_atc_with_name(filename,
                          heuristic_function, 
                          explain_time,
                          output_folder = None,
-                         times = None):
+                         times = None,
+                         is_museum_experiment=False):
     time_list = []
     if times is not None:
         time_list = times
@@ -54,7 +55,8 @@ def create_atc_with_name(filename,
                      wait_time=wait_time,
                      heuristic_function=heuristic_function,
                      explain_time=explain_time,
-                     output_folder=output_folder)
+                     output_folder=output_folder,
+                     is_museum_experiment=is_museum_experiment)
 
 def create_madama_with_name(filename, 
                          solution_time_bound, 
@@ -68,7 +70,8 @@ def create_madama_with_name(filename,
                          heuristic_function,
                          explain_time,
                          output_folder = None,
-                         times = None):
+                         times = None,
+                         is_museum_experiment=False):
     time_list = []
     with open('data/datasets/madama/madama_reduced_decimals.csv', 'r') as file:
         reader = csv.reader(file)
@@ -98,7 +101,8 @@ def create_madama_with_name(filename,
                      wait_time=wait_time,
                      heuristic_function=heuristic_function,
                      explain_time=explain_time,
-                     output_folder=output_folder)
+                     output_folder=output_folder,
+                     is_museum_experiment=is_museum_experiment)
 
 def print_usage():
     print("Usage:")
@@ -113,6 +117,7 @@ if __name__ == "__main__":
     # if the argument is the name of the function, then execute the function
     args = sys.argv[1:]
     map_name = ""
+    is_museum_experiment = False
     if "--map" in args:
         map_index = args.index("--map")
         if map_index + 1 < len(args):
@@ -204,6 +209,8 @@ if __name__ == "__main__":
                 except ValueError:
                     print("Invalid time value:", time_str)
                     break
+        if "--museum_experiments" in args:
+            is_museum_experiment = True
 
         if "--times_file" in args:
             times_file_index = args.index("--times_file")
@@ -268,7 +275,8 @@ if __name__ == "__main__":
                                  heuristic_function=heuristic_function,
                                  times=times, 
                                  explain_time=explain_time,
-                                 output_folder=results_folder)
+                                 output_folder=results_folder, 
+                                 is_museum_experiment=is_museum_experiment)
         elif "madama" in map_name:
             create_madama_with_name(filename=path, 
                                     solution_time_bound=solution_time_bound, 
@@ -281,7 +289,8 @@ if __name__ == "__main__":
                                     heuristic_function=heuristic_function,
                                     times=times, 
                                     explain_time=explain_time,
-                                    output_folder=results_folder)
+                                    output_folder=results_folder, 
+                                    is_museum_experiment=is_museum_experiment)
         else:
             print("Function not found: ", arg)
             print_usage()

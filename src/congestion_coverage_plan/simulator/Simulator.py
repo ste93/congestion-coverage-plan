@@ -46,6 +46,8 @@ class Simulator:
                          visited_vertices=state.get_visited_vertices().copy(), 
                          pois_explained=pois_explained), 0, self._explain_time
         calculated_traverse_time, collisions = self.calculate_traverse_time(state, action)
+        print("========================calculated_traverse_time", calculated_traverse_time)
+        print("========================collisions", collisions)
 
         next_time = state.get_time() + calculated_traverse_time
         next_time = math.trunc(next_time * 100) / 100  # Truncate to two decimal places
@@ -195,7 +197,7 @@ class Simulator:
         return (state.get_time(), executed_steps, steps_time)
 
 
-    def simulate_lrtdp(self, start_time, initial_state, convergence_threshold, logger=None, simulate_planning_while_moving=False, heuristic_function=None):
+    def simulate_lrtdp(self, start_time, initial_state, convergence_threshold, logger=None, simulate_planning_while_moving=False, heuristic_function=None, is_museum_experiment=False):
         # print("start_time", start_time)
         self.set_time_for_occupancies(start_time)
         completed = False
@@ -220,14 +222,16 @@ class Simulator:
                                    solution_time_bound=self._solution_time_bound,
                                    logger=logger,
                                    convergence_threshold=convergence_threshold,
-                                   heuristic_function=heuristic_function)
+                                   heuristic_function=heuristic_function, 
+                                   is_museum_experiment=is_museum_experiment)
             else:
                 policy = self.plan(current_state=state, 
                                    planning_time_bound=future_planning_time,
                                    solution_time_bound=self._solution_time_bound,
                                    logger=logger,
                                    convergence_threshold=convergence_threshold,
-                                   heuristic_function=heuristic_function)
+                                   heuristic_function=heuristic_function, 
+                                   is_museum_experiment=is_museum_experiment)
             total_planning_time = datetime.now() - initial_planning_time
             planning_time.append(float(total_planning_time.total_seconds()))
             # sleep 100
@@ -291,7 +295,7 @@ class Simulator:
         return self._occupancy_map.get_current_occupancies()
 
 
-    def plan(self, current_state, logger, planning_time_bound, solution_time_bound, convergence_threshold, heuristic_function):
+    def plan(self, current_state, logger, planning_time_bound, solution_time_bound, convergence_threshold, heuristic_function, is_museum_experiment=False):
         # print("current_state", current_state)
         # print("start_time", self._start_time)
         # print("planning time", self._time_for_occupancies,  current_state.get_time())
@@ -308,7 +312,8 @@ class Simulator:
                                    wait_time=self._wait_time,
                                    initial_state=current_state, 
                                    logger=logger,
-                                   heuristic_function=heuristic_function)
+                                   heuristic_function=heuristic_function,
+                                   is_museum_experiment=is_museum_experiment)
         # print("done creating")
         end_time = datetime.now()
         logger.log_time_elapsed("lrtdp_creation_time", (end_time - init_time).total_seconds())
@@ -405,7 +410,7 @@ def simulate_tsp_current_occupancy_with_replanning(simulator, time, occupancy_ma
     file.flush()
 
     
-def simulate_lrtdp(simulator, time, occupancy_map,  initial_state_name, writer, file, logger, convergence_threshold, heuristic_function):
+def simulate_lrtdp(simulator, time, occupancy_map,  initial_state_name, writer, file, logger, convergence_threshold, heuristic_function, is_museum_experiment=False):
     print("-------------------------------------lrtdp----------------------------------")
     initial_time = datetime.now()
     print("simulate_lrtdp: time", time)
@@ -417,7 +422,8 @@ def simulate_lrtdp(simulator, time, occupancy_map,  initial_state_name, writer, 
                                             convergence_threshold,
                                             logger, 
                                             simulate_planning_while_moving=False,
-                                            heuristic_function=heuristic_function)
+                                            heuristic_function=heuristic_function, 
+                                            is_museum_experiment=is_museum_experiment)
     print("=====================================end lrtdp==============================")
     time_used = datetime.now() - initial_time
     writer.writerow([time, "steps_lrtdp", steps_lrtdp[0], steps_lrtdp[1], time_used, steps_lrtdp[3], steps_lrtdp[2], len(occupancy_map.get_occupancy_levels())])

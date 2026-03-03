@@ -4,6 +4,7 @@ from congestion_coverage_plan.mdp.MDP import MDP, State
 import datetime
 from scipy.sparse import csr_array
 from scipy.sparse.csgraph import shortest_path
+from congestion_coverage_plan.solver.LKH_Solver import solve_hamiltonian_path_with_lkh
 from congestion_coverage_plan.utils import Logger
 from scipy.sparse.csgraph import shortest_path, minimum_spanning_tree
 import numpy as np
@@ -18,9 +19,11 @@ class Heuristics():
                  occupancy_map, 
                  mdp,
                  heuristic_function="mst_shortest_path",
-                 logger = None):
+                 logger = None, 
+                 is_museum_experiment=False):
         self.occupancy_map = occupancy_map
         self._mdp = mdp
+        self.is_museum_experiment = is_museum_experiment
         # self.logger = logger if logger is not None else Logger()
         self.shortest_paths_matrix = self.calculate_shortest_path_matrix()
         self.minimum_edge_entering_vertices_dict = self.minimum_edge_entering_vertices()
@@ -30,27 +33,30 @@ class Heuristics():
         heuristic_function_name = heuristic_function
         self.vertex_to_idx = self.compute_vertex_to_idx_mapping()  # Pre-compute vertex to index mapping for MST heuristic
         self.heuristic_function = None
-        if heuristic_function_name == "teleport":
-            self.heuristic_function = self.heuristic_teleport
-        elif heuristic_function_name == "mst_shortest_path":
-            self.heuristic_function = self.heuristic_mst_shortest_path
-        elif heuristic_function_name == "mst":
-            self.heuristic_function = self.heuristic_mst
-        elif heuristic_function_name == "hybrid_mst":
-            self.heuristic_function = self.heuristic_hybrid_mst
-        elif heuristic_function_name == "hamiltonian_path":
-            self.heuristic_function = self.heuristic_hamiltonian_path
-        elif heuristic_function_name == "hamiltonian_path_with_shortest_path":
-            self.heuristic_function = self.heuristic_hamiltonian_path_with_shortest_path
-        elif heuristic_function_name == "mst2":
-            self.heuristic_function = self.heuristic_mst2
-        elif heuristic_function_name == "tight_mst":
-            self.heuristic_function = self.heuristic_tight_mst
-        elif heuristic_function_name == "madama_experiments":
+        if is_museum_experiment:
             self.heuristic_function = self.heuristic_experiments
         else:
-            print("Heuristic function not recognized", heuristic_function_name, "available heuristic functions: teleport, mst_shortest_path, mst, hybrid_mst, hamiltonian_path, hamiltonian_path_with_shortest_path, mst2, madama_experiments")
-            sys.exit(1)
+            if heuristic_function_name == "teleport":
+                self.heuristic_function = self.heuristic_teleport
+            elif heuristic_function_name == "mst_shortest_path":
+                self.heuristic_function = self.heuristic_mst_shortest_path
+            elif heuristic_function_name == "mst":
+                self.heuristic_function = self.heuristic_mst
+            elif heuristic_function_name == "hybrid_mst":
+                self.heuristic_function = self.heuristic_hybrid_mst
+            elif heuristic_function_name == "hamiltonian_path":
+                self.heuristic_function = self.heuristic_hamiltonian_path
+            elif heuristic_function_name == "hamiltonian_path_with_shortest_path":
+                self.heuristic_function = self.heuristic_hamiltonian_path_with_shortest_path
+            elif heuristic_function_name == "mst2":
+                self.heuristic_function = self.heuristic_mst2
+            elif heuristic_function_name == "tight_mst":
+                self.heuristic_function = self.heuristic_tight_mst
+            elif heuristic_function_name == "madama_experiments":
+                self.heuristic_function = self.heuristic_experiments
+            else:
+                print("Heuristic function not recognized", heuristic_function_name, "available heuristic functions: teleport, mst_shortest_path, mst, hybrid_mst, hamiltonian_path, hamiltonian_path_with_shortest_path, mst2, madama_experiments")
+                sys.exit(1)
 
 
     ### HEURISTIC HELPERS
@@ -243,14 +249,20 @@ class Heuristics():
     def heuristic_hamiltonian_path(self, state):
         if self._mdp.solved(state):
             return 0
-        matrix = create_matrix_from_vertices_list(vertices_ids=list(set(self.occupancy_map.get_vertices_list()) - state.get_visited_vertices()) + [state.get_vertex()], 
+        vertices_list = list(set(self.occupancy_map.get_vertices_list()) - state.get_visited_vertices()) + [state.get_vertex()]
+        matrix = create_matrix_from_vertices_list(vertices_ids=vertices_list, 
                                                   occupancy_map=self.occupancy_map, 
                                                   initial_vertex_id=state.get_vertex(),
-                                                  value_for_not_existent_edge=99999999)
+                                                  value_for_not_existent_edge=999999)
                                                 #   value_for_not_existent_edge=np.array([np.inf]).astype(int)[0])
         # print("matrix for hamiltonian path heuristic:", matrix)
-        data = create_data_model_from_matrix(matrix)
-        cost = solve_with_google_with_data(data)
+
+        vertices_list = ["fake"] + vertices_list 
+        print("map_current_occupancy")
+
+        # data = create_data_model_from_matrix(map_current_occupancy)
+        policy, cost = solve_hamiltonian_path_with_lkh(matrix, vertices_list, time_limit_seconds=1)
+
         return cost if cost is not None else 9999999
 
 

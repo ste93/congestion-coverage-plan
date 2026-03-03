@@ -104,12 +104,13 @@ class Transition:
 
 
 class MDP:
-    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, explain_time, logger=None, do_museum_trials=False):
+    def __init__(self, occupancy_map, time_for_occupancies , time_start, wait_time, explain_time, logger=None, is_museum_experiment=False):
         self.occupancy_map = occupancy_map
         self.time_start = time_start
         self.time_for_occupancies = time_for_occupancies
         self._wait_time = wait_time
         self._explain_time = explain_time
+        self.is_museum_experiment = is_museum_experiment    
         if logger is not None:
             self.logger = logger
         else:
@@ -118,7 +119,7 @@ class MDP:
         self.solved = None
         self.compute_next_state = None
         self.get_possible_actions = None
-        if do_museum_trials:
+        if self.is_museum_experiment:
             self.solved = self.solved_museum
             self.compute_next_state = self.compute_next_state_museum
             self.get_possible_actions = self.get_possible_actions_museum
@@ -290,7 +291,7 @@ class MDP:
             current_vertex = self.occupancy_map.find_vertex_from_id(state.get_vertex())
             pois_explained = state.get_pois_explained().union(set([current_vertex.get_poi_number()]))
             
-            print("Explaining POI:", current_vertex.get_poi_number(), "Total explained:", pois_explained)
+            # print("Explaining POI:", current_vertex.get_poi_number(), "Total explained:", pois_explained)
             return State(vertex=state.get_vertex(), 
                          time=state.get_time() + transition.get_cost(), 
                          visited_vertices=state.get_visited_vertices(), 
