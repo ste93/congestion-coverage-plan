@@ -72,7 +72,9 @@ class LrtdpTvmaAlgorithm():
     ### HELPERS
     def get_policy(self):
         return self.policy
-
+    
+    def get_policy_to_execute(self):
+        return self.policy_to_execute
 
     ### Q VALUES
     def calculate_Q(self, state, action):
@@ -323,7 +325,11 @@ class LrtdpTvmaAlgorithm():
                 break
             transition_selected = np.random.choice(transitions, p=[t.get_probability() for t in transitions])
             # print("transition selected:", transition_selected.get_action())
+            old_state_str = state.to_string()
             state = self.mdp.compute_next_state(state, transition_selected)
+
+            self.policy_to_execute[old_state_str] = (greedy[0], greedy[1], greedy[2], state)
+
         # print("Forward pass completed. Starting backward pass to check visited states.")
         # print("solved initial state? ", self.solved(self.vinitState))
         # print("number of visited states in this trial:", len(visited_list))
