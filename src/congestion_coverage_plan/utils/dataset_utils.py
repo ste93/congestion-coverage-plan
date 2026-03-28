@@ -9,7 +9,12 @@ from congestion_coverage_plan.utils.dataset_utils import *
 import matplotlib.pyplot as plt
 
 
-
+def is_ros_available():
+    try:
+        import rclpy
+        return True
+    except ImportError:
+        return False
 
 class Method(Enum):
     MoD = 1
@@ -86,6 +91,16 @@ def read_human_traj_data_from_file(human_traj_file):
     # data = millimeter_to_meter(data, ["x", "y", "z", "velocity"])
 
     return data
+
+
+def read_human_traj_data_from_file_madama(human_traj_file):
+    data = pd.read_csv(human_traj_file, header=None)
+    data.columns = ["time", "person_id", "x", "y", "vx", "vy"]
+    # data = millimeter_to_meter(data, ["x", "y", "z", "velocity"])
+
+    return data
+
+
 
 def read_cliff_map_data(cliff_map_file):
     data = pd.read_csv(cliff_map_file, header=None)
@@ -186,3 +201,9 @@ def convert_atc_dataset(filename_in, filename_out):
 def create_folder(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+
+def convert_vx_vy_to_velocity_motion_angle(vx, vy):
+    velocity = np.sqrt(vx**2 + vy**2)
+    motion_angle = np.arctan2(vy, vx)
+    return velocity, motion_angle

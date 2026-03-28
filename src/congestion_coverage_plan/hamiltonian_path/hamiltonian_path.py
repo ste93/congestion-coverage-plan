@@ -394,8 +394,8 @@ def get_current_occupancies(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
-        if edge_id in occupancies.keys():
+        traverse_time = occupancy_map.get_edge_traverse_times(edge_id)
+        if occupancies is not None and edge_id in occupancies.keys():
             for level in occupancy_map.get_occupancy_levels():
                 if occupancies[edge_id] in range(occupancy_map.find_edge_limit(edge_id)[level][0], occupancy_map.find_edge_limit(edge_id)[level][1]):
                     return math.floor(traverse_time[level] * 100)
@@ -420,8 +420,8 @@ def get_medium_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
-        if edge_id in occupancies.keys():
+        traverse_time = occupancy_map.get_edge_traverse_times(edge_id)
+        if occupancies is not None and edge_id in occupancies.keys():
             for level in occupancy_map.get_occupancy_levels():
                 if occupancies[edge_id] in range(occupancy_map.find_edge_limit(edge_id)[level][0], occupancy_map.find_edge_limit(edge_id)[level][1]):
                     return math.floor(traverse_time[level] * 100)
@@ -437,8 +437,8 @@ def get_high_occupancy(occupancy_map, idVertex1, idVertex2, occupancies):
     else:
         edge_id = edge.get_id()
         # here should be a function
-        traverse_time =occupancy_map.get_edge_traverse_time(edge_id)
-        if edge_id in occupancies.keys():
+        traverse_time = occupancy_map.get_edge_traverse_times(edge_id)
+        if occupancies is not None and edge_id in occupancies.keys():
             return math.floor(traverse_time[occupancy_map.get_occupancy_levels()[-1]] * 100)
         else:
             return math.floor(traverse_time["zero"] * 100)
@@ -457,7 +457,7 @@ def create_matrix_from_occupancy_map_high_occupancy(occupancy_map, time, initial
 
 def create_matrix_from_occupancy_map_generic(occupancy_map, time, initial_vertex_id, length_function):
     matrix = []
-    occupancies = occupancy_map.get_current_occupancies(time)
+    occupancies = occupancy_map.get_current_occupancies()
 
     vertices = occupancy_map.get_vertices()
     for row_id in range(0, len(vertices.keys()) + 1):
@@ -587,6 +587,8 @@ def create_matrix_from_vertices_list_from_shortest_path_matrix_tsp(vertices_ids,
 
 def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex_id, value_for_not_existent_edge=INFINITE_DISTANCE, length_function=None, time_for_occupancies=None):
     matrix = []
+    if time_for_occupancies is not None:
+        occupancy_map.set_time_for_fake_detections_retriever(time_for_occupancies)
     initial_vertex_index = vertices_ids.index(initial_vertex_id) + 1
     print("vertices_ids", vertices_ids)
     print("initial_vertex_index", initial_vertex_index)
@@ -619,7 +621,7 @@ def create_matrix_from_vertices_list(vertices_ids, occupancy_map, initial_vertex
                 else:
                     # print("finding edge from", vertex_row_id, vertex_column_id)
                     if length_function is not None:
-                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_occupancies_by_time(time_for_occupancies))
+                        edge_length = length_function(occupancy_map, vertex_row_id, vertex_column_id, occupancy_map.get_current_occupancies())
                         row.append(math.floor(edge_length * 100))
                     else:
                         edge_length = occupancy_map.find_edge_from_position(vertex_row_id, vertex_column_id)

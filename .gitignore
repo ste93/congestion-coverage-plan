@@ -8,8 +8,13 @@ python-environment
 python-environment/*
 docs/source/API
 docs/build
+ros_nodes/build
+ros_nodes/install
+ros_nodes/log
 
-
+ros_nodes/build/*
+ros_nodes/install/*
+ros_nodes/log/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

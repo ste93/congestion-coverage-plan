@@ -79,7 +79,10 @@ class TrajectoryPredictor:
         total_predicted_motion_list = []
         current_motion_origin = self._calculate_current_motion()
 
-        for _ in range(20):
+        # Reduce samples from 20 to 10 for faster prediction
+        # This is a trade-off between accuracy and speed
+        num_samples = 10
+        for _ in range(num_samples):
             current_motion = current_motion_origin
             predicted_motion_list = np.copy(self.human_traj_data[self.start_length:self.start_length + self.observed_tracklet_length, :])
             for time_index in range(1, int(self.planning_horizon / self.delta_t) + 2):
@@ -226,23 +229,25 @@ class TrajectoryPredictor:
         return np.exp(-self.beta*x**2)
 
     def _find_near_high_observed_SWGMM_in_cliffmap(self, current_motion):
-        near_SWGMM = []
         current_location = current_motion[1:3]
         location_array = self.cliff_map[:,0:2]
-        near_index_list = np.where(np.sum(np.power(location_array - current_location, 2), axis=1) < self.sample_radius)
-        max_observation_ratio = None
-        max_observation_ratio_index = None
-        if len(near_index_list[0]) == 0:
-            return None
-        for index in near_index_list[0]:
-            observation_ratio = self.cliff_map[index, 10]
-            if (not max_observation_ratio) or observation_ratio > max_observation_ratio:
-                max_observation_ratio = observation_ratio
-                max_observation_ratio_index = index
         
-        index_list = np.where((location_array[:, 0] == location_array[max_observation_ratio_index][0]) & (location_array[:, 1] == location_array[max_observation_ratio_index][1]))
-        for index in index_list[0]:
-            near_SWGMM.append(self.cliff_map[index].tolist())
+        # Vectorized distance calculation - more efficient than np.sum(np.power(...))
+        distances_sq = np.sum((location_array - current_location)**2, axis=1)
+        near_mask = distances_sq < self.sample_radius
+        
+        if not np.any(near_mask):
+            return None
+        
+        # Find max observation ratio among nearby points
+        near_indices = np.where(near_mask)[0]
+        observation_ratios = self.cliff_map[near_indices, 10]
+        max_idx = near_indices[np.argmax(observation_ratios)]
+        
+        # Get all SWGMM at the same location
+        max_location = location_array[max_idx]
+        same_location_mask = (location_array[:, 0] == max_location[0]) & (location_array[:, 1] == max_location[1])
+        near_SWGMM = self.cliff_map[same_location_mask].tolist()
 
         return near_SWGMM
 
